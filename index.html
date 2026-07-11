@@ -595,7 +595,7 @@
         <div class="card">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
                 <h2 style="margin:0"><i class="fa-solid fa-clipboard-list"></i> Attendance &amp; OT</h2>
-                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <div id="downloadBtnRow" style="display:flex;gap:8px;flex-wrap:wrap">
                     <button class="btn-secondary btn-sm" onclick="downloadOTReport()"><i class="fa-solid fa-download"></i> OT Report</button>
                     <button class="btn-secondary btn-sm" onclick="downloadAttendanceReport()"><i class="fa-solid fa-download"></i> Attendance Report</button>
                 </div>
@@ -1752,6 +1752,7 @@ async function loadAttendance() {
     document.getElementById('attSummary').textContent =
         `Present: ${presentDays} | Late: ${lateDays} | Absent: ${absentDays} | Total Hrs: ${totalHrs.toFixed(1)} | Total OT: ${totalOT}h`;
     document.getElementById('attLogCard').style.display = isAdminUser() ? 'block' : 'none';
+    document.getElementById('downloadBtnRow').style.display = isAdminUser() ? 'flex' : 'none';
 }
 
 async function manualLogAttendance() {
@@ -1779,73 +1780,200 @@ async function manualLogAttendance() {
 // ============================================================
 // DOWNLOAD REPORTS (XLSX via SheetJS)
 // ============================================================
+function getMonthDayNames(year, month) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const dateNums = [];
+    const dayNames = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+        dateNums.push(d);
+        dayNames.push(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(year, month - 1, d).getDay()]);
+    }
+    return { daysInMonth, dateNums, dayNames };
+}
+
 async function downloadOTReport() {
-    const empId = document.getElementById('att_empId').value;
-    const month = document.getElementById('att_month').value;
-    const year = document.getElementById('att_year').value;
-    if (!empId) { showToast('Select an employee first', 'error'); return; }
+    const month = parseInt(document.getElementById('att_month').value);
+    const year = parseInt(document.getElementById('att_year').value);
+    const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][month - 1];
 
-    const result = await callAPI('getAttendanceReport', { employeeId: empId, month, year });
-    if (!result.success || !result.data) return;
+    const result = await callAPI('getOTReport', { month, year });
+    if (!result.success) { showToast('Failed to fetch OT data', 'error'); return; }
 
-    const data = result.data;
-    const emp = STATE.employees.find(e => e.employeeId === empId);
-    const empName = emp ? emp.fullName || emp.employeeId : empId;
+    const data = result.data;  // { empId: [{date, otHours, ...}, ...], ... }
+    const { daysInMonth, dateNums, dayNames } = getMonthDayNames(year, month);
+    const totalDataCols = 4 + daysInMonth + 2;  // B-D + E..AI + AJ + AK
 
-    // Build data array matching the Over Time template
-    const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(month)-1];
+    // Build employee name lookup
+    const empNames = {};
+    STATE.employees.forEach(e => empNames[e.employeeId] = e.fullName || e.employeeId);
 
+    // Sort by employeeId for consistent order
+    const empIds = Object.keys(data).sort();
+
+    // Employee data rows
+    const empRows = [];
+    let sl = 1;
+    for (const empId of empIds) {
+        const report = data[empId] || [];
+        const dayVals = dateNums.map(d => {
+            const day = report.find(r => parseInt(r.date.split('-')[2]) === d);
+            const ot = day ? (parseFloat(day.otHours) || 0) : 0;
+            return ot >= 1 ? ot : '';
+        });
+        const total = dayVals.reduce((s, v) => s + (parseFloat(v) || 0), 0);
+        empRows.push([sl++, empNames[empId] || empId, empId, ...dayVals, total, '']);
+    }
+
+    // Per Day OT summary row
+    const perDayRow = ['', '', 'Per Day OT :'];
+    let perDayTotal = 0;
+    for (let d = 0; d < daysInMonth; d++) {
+        let sum = 0;
+        for (const row of empRows) sum += parseFloat(row[3 + d]) || 0;
+        perDayRow.push(sum || '');
+        perDayTotal += sum;
+    }
+    perDayRow.push(perDayTotal || '', '');  // AJ = sum of per-day sums
+
+    // Total Over Time row
+    const grandTotal = empRows.reduce((s, row) => s + (parseFloat(row[3 + daysInMonth]) || 0), 0);
+    const totalRow = ['', `Total Over Time ${monthName}-${year}`, ''];
+    for (let d = 0; d < daysInMonth; d++) totalRow.push('');
+    totalRow.push(grandTotal || '', '');
+
+    // Build full sheet data
     const wsData = [
-        [`TUUO Solutions Limited\nOver Time ${monthName}_${year}`],
+        [1126],
+        ['', `TUUO Solutions Limited\nOver Time ${monthName}_${year}`],
+        [],
         ['SL', 'Name', 'ID'],
-        ['Date', ...data.map(d => parseInt(d.date.split('-')[2], 10)), 'Total OT', 'OT - Hrs'],
-        ['Day', ...data.map(d => {
-            const dt = new Date(d.date);
-            return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()];
-        }), monthName, 'Notes'],
-        [1, empName, empId, ...data.map(d => d.otHours > 0 ? d.otHours : ''), data.reduce((s,d) => s + (parseFloat(d.otHours)||0), 0), '']
+        ['Date', ...dateNums, 'Total OT', 'OT - Hrs'],
+        ['Day', ...dayNames, monthName, 'Notes'],
+        ...empRows,
+        perDayRow,
+        totalRow
     ];
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Merged cells
+    const lastDataCol = 3 + daysInMonth;  // last day column index
+    ws['!merges'] = [
+        { s: { r: 1, c: 1 }, e: { r: 1, c: totalDataCols - 1 } },  // Title B2:AK2
+        { s: { r: 4, c: 1 }, e: { r: 4, c: 3 } },                   // "Date" B5:D5
+        { s: { r: 5, c: 1 }, e: { r: 5, c: 3 } },                   // "Day" B6:D6
+        { s: { r: wsData.length - 1, c: 1 }, e: { r: wsData.length - 1, c: lastDataCol } }  // Total row merge
+    ];
+
+    // Column widths (matching template)
+    const cols = [
+        { wch: 4.3 },           // A
+        { wch: 5.1 },           // B - SL
+        { wch: 28 },            // C - Name
+        { wch: 7.9 },           // D - ID
+    ];
+    for (let i = 0; i < daysInMonth; i++) {
+        cols.push({ wch: 4 });  // E..AI - day columns
+    }
+    cols.push({ wch: 12.9 });   // AJ - Total OT
+    cols.push({ wch: 14.4 });   // AK - OT - Hrs
+    ws['!cols'] = cols;
+
     XLSX.utils.book_append_sheet(wb, ws, `${monthName}-${year}`);
-    XLSX.writeFile(wb, `Over_Time_${monthName}_${year}_${empId}.xlsx`);
+    XLSX.writeFile(wb, `Over_Time_${monthName}_${year}.xlsx`);
     showToast('OT report downloaded', 'success');
 }
 
 async function downloadAttendanceReport() {
-    const empId = document.getElementById('att_empId').value;
-    const month = document.getElementById('att_month').value;
-    const year = document.getElementById('att_year').value;
-    if (!empId) { showToast('Select an employee first', 'error'); return; }
+    const month = parseInt(document.getElementById('att_month').value);
+    const year = parseInt(document.getElementById('att_year').value);
+    const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][month - 1];
 
-    const result = await callAPI('getAttendanceReport', { employeeId: empId, month, year });
-    if (!result.success || !result.data) return;
+    const result = await callAPI('getAttendanceReport', { month, year });
+    if (!result.success) { showToast('Failed to fetch attendance data', 'error'); return; }
 
     const data = result.data;
-    const emp = STATE.employees.find(e => e.employeeId === empId);
-    const empName = emp ? emp.fullName || emp.employeeId : empId;
+    const { daysInMonth, dateNums, dayNames } = getMonthDayNames(year, month);
+    const totalDataCols = 4 + daysInMonth + 2;
 
-    const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(month)-1];
+    const empNames = {};
+    STATE.employees.forEach(e => empNames[e.employeeId] = e.fullName || e.employeeId);
 
-    // Build attendance data (1 for leave/absent, 0 for present)
+    const empIds = Object.keys(data).sort();
+
+    // Employee data rows
+    const empRows = [];
+    let sl = 1;
+    for (const empId of empIds) {
+        const report = data[empId] || [];
+        let totalAbsent = 0;
+        const dayVals = dateNums.map(d => {
+            const day = report.find(r => parseInt(r.date.split('-')[2]) === d);
+            if (!day) return '';
+            const isAbsent = day.status === 'Absent';
+            const isLate = day.status && day.status.includes('Late');
+            if (isAbsent) totalAbsent++;
+            return (isAbsent || isLate) ? 1 : '';
+        });
+        const totalLeave = dayVals.filter(v => v === 1).length;
+        empRows.push([sl++, empNames[empId] || empId, empId, ...dayVals, totalLeave, totalAbsent]);
+    }
+
+    // Per Day Leave/Absent summary row
+    const perDayRow = ['', '', 'Per Day Leave/Absent'];
+    let perDayTotal = 0;
+    for (let d = 0; d < daysInMonth; d++) {
+        let sum = 0;
+        for (const row of empRows) sum += parseInt(row[3 + d]) || 0;
+        perDayRow.push(sum || '');
+        perDayTotal += sum;
+    }
+    perDayRow.push(perDayTotal || '', '');
+
+    // Total Leave row
+    const grandLeave = empRows.reduce((s, row) => s + (parseInt(row[3 + daysInMonth]) || 0), 0);
+    const grandAbsent = empRows.reduce((s, row) => s + (parseInt(row[4 + daysInMonth]) || 0), 0);
+    const totalRow = ['', `Total Leave ${monthName}_${year}`, ''];
+    for (let d = 0; d < daysInMonth; d++) totalRow.push('');
+    totalRow.push(grandLeave || '', grandAbsent || '');
+
     const wsData = [
-        [`TUUO Solutions Limited\nLeave Tracker ${monthName}_${year}`],
+        [],
+        ['', `TUUO Solutions Limited\nLeave Tracker ${monthName}_${year}`],
+        [],
         ['SL', 'Name', 'ID'],
-        ['Date', ...data.map(d => parseInt(d.date.split('-')[2], 10)), 'Total Leave', 'Total Absent'],
-        ['Day', ...data.map(d => {
-            const dt = new Date(d.date);
-            return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()];
-        }), monthName, monthName],
-        [1, empName, empId, ...data.map(d => d.status === 'Absent' ? 1 : (d.status && d.status.includes('Late') ? 1 : 0)),
-         data.filter(d => d.status === 'Absent' || (d.status && d.status.includes('Late'))).length,
-         data.filter(d => d.status === 'Absent').length]
+        ['Date', ...dateNums, 'Total Leave', 'Total Absent'],
+        ['Day', ...dayNames, monthName, monthName],
+        ...empRows,
+        perDayRow,
+        totalRow
     ];
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    const lastDataCol = 3 + daysInMonth;
+    ws['!merges'] = [
+        { s: { r: 1, c: 1 }, e: { r: 1, c: totalDataCols - 1 } },
+        { s: { r: 4, c: 1 }, e: { r: 4, c: 3 } },
+        { s: { r: 5, c: 1 }, e: { r: 5, c: 3 } },
+        { s: { r: wsData.length - 1, c: 1 }, e: { r: wsData.length - 1, c: lastDataCol } }
+    ];
+
+    const cols = [
+        { wch: 4.3 },
+        { wch: 5.1 },
+        { wch: 28 },
+        { wch: 7.9 },
+    ];
+    for (let i = 0; i < daysInMonth; i++) cols.push({ wch: 4 });
+    cols.push({ wch: 12.9 });
+    cols.push({ wch: 14.4 });
+    ws['!cols'] = cols;
+
     XLSX.utils.book_append_sheet(wb, ws, `${monthName}-${year}`);
-    XLSX.writeFile(wb, `Leave_Absent_Report_${monthName}_${year}_${empId}.xlsx`);
+    XLSX.writeFile(wb, `Leave_Absent_Report_${monthName}_${year}.xlsx`);
     showToast('Attendance report downloaded', 'success');
 }
 
