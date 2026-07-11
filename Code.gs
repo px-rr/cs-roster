@@ -21,6 +21,9 @@ var SHEETS = {
   OT_LOG: 'OTLog',
   ROSTER: 'Roster',
   NOTICES: 'Notices',
+  FLASH: 'FlashMessages',
+  PENDING: 'PendingItems',
+  ATTENDANCE: 'AttendanceLog',
   SESSIONS: 'Sessions',
   AUDIT: 'AuditLog'
 };
@@ -88,6 +91,25 @@ function routeAction(action, params) {
     case 'getNotices': return handleGetNotices(params);
     case 'addNotice': return requireAdmin(params, handleAddNotice);
 
+    // Flash Messages
+    case 'getFlashMessages': return handleGetFlashMessages(params);
+    case 'addFlashMessage': return requireAdmin(params, handleAddFlashMessage);
+    case 'updateFlashMessage': return requireAdmin(params, handleUpdateFlashMessage);
+    case 'deleteFlashMessage': return requireSuperAdmin(params, handleDeleteFlashMessage);
+
+    // Pending Items
+    case 'getPendingItems': return handleGetPendingItems(params);
+    case 'addPendingItem': return handleAddPendingItem(params);
+    case 'updatePendingItem': return handleUpdatePendingItem(params);
+    case 'deletePendingItem': return requireSuperAdmin(params, handleDeletePendingItem);
+
+    // Attendance
+    case 'getAttendance': return handleGetAttendance(params);
+    case 'updateAttendance': return requireAdmin(params, handleUpdateAttendance);
+    case 'recordAttendance': return requireAdmin(params, handleRecordAttendance);
+    case 'getAttendanceReport': return requireAdmin(params, handleGetAttendanceReport);
+    case 'getOTReport': return requireAdmin(params, handleGetOTReport);
+
     // Setup
     case 'setup': return handleSetup();
 
@@ -154,6 +176,17 @@ function handleLogin(params) {
 
   var token = generateToken();
   storeSession(token, String(userRow[0]));
+  var empId = String(userRow[0]);
+
+  // Record login timestamp
+  try {
+    var attSheet = getSheet(SHEETS.ATTENDANCE);
+    var now = new Date();
+    var today = formatDateObj(now);
+    var timeStr = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+
+    attSheet.appendRow([empId, today, 'login', timeStr, now.toISOString()]);
+  } catch(e) {}
 
   var isDefaultPw = (hashPassword(String(userRow[0])) === storedHash);
 
@@ -188,7 +221,20 @@ function handleChangePassword(params) {
 }
 
 function handleLogout(params) {
-  if (params.token) removeSession(params.token);
+  if (params.token) {
+    // Record logout timestamp
+    try {
+      var session = validateSession(params.token);
+      if (session) {
+        var attSheet = getSheet(SHEETS.ATTENDANCE);
+        var now = new Date();
+        var today = formatDateObj(now);
+        var timeStr = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+        attSheet.appendRow([String(session.employeeId), today, 'logout', timeStr, now.toISOString()]);
+      }
+    } catch(e) {}
+    removeSession(params.token);
+  }
   return { success: true };
 }
 
@@ -612,6 +658,366 @@ function handleAddNotice(params, authUser) {
 }
 
 // ============================================================
+// FLASH MESSAGES
+// ============================================================
+
+function handleGetFlashMessages(params) {
+  var sheet = getSheet(SHEETS.FLASH);
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { success: true, data: [] };
+  var headers = data[0];
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = {};
+    for (var j = 0; j < headers.length; j++) {
+      row[headers[j]] = (j < data[i].length) ? data[i][j] : '';
+    }
+    rows.push(row);
+  }
+  return { success: true, data: rows };
+}
+
+function handleAddFlashMessage(params, authUser) {
+  var text = String(params.text || '').trim();
+  if (!text) return { success: false, error: 'Message text is required' };
+
+  var sheet = getSheet(SHEETS.FLASH);
+  var headers = sheet.getDataRange().getValues()[0] || [];
+  if (headers.length === 0 || headers[0] !== 'id') {
+    sheet.clear();
+    sheet.getRange(1,1,1,5).setValues([['id','text','active','createdBy','createdAt']]);
+  }
+  sheet.appendRow([new Date().getTime().toString(), text, 'true', authUser.employeeId, new Date().toISOString()]);
+  return { success: true };
+}
+
+function handleUpdateFlashMessage(params, authUser) {
+  var msgId = String(params.id || '');
+  var text = String(params.text || '');
+  var active = params.active !== undefined ? String(params.active) : null;
+
+  var sheet = getSheet(SHEETS.FLASH);
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === msgId) {
+      if (text) sheet.getRange(i+1, 2).setValue(text);
+      if (active !== null) sheet.getRange(i+1, 3).setValue(active);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Message not found' };
+}
+
+function handleDeleteFlashMessage(params, authUser) {
+  var msgId = String(params.id || '');
+  var sheet = getSheet(SHEETS.FLASH);
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === msgId) {
+      sheet.deleteRow(i+1);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Message not found' };
+}
+
+// ============================================================
+// PENDING ITEMS (replaces static notices)
+// ============================================================
+
+function handleGetPendingItems(params) {
+  var sheet = getSheet(SHEETS.PENDING);
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { success: true, data: [] };
+  var headers = data[0];
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    var row = {};
+    for (var j = 0; j < headers.length; j++) {
+      row[headers[j]] = (j < data[i].length) ? data[i][j] : '';
+    }
+    rows.push(row);
+  }
+  rows.sort(function(a,b) { return (a.completed === 'true' ? 1 : 0) - (b.completed === 'true' ? 1 : 0); });
+  return { success: true, data: rows };
+}
+
+function handleAddPendingItem(params, authUser) {
+  var user = authenticate(params);
+  if (!user) return { success: false, error: 'Authentication required' };
+
+  var text = String(params.text || '').trim();
+  if (!text) return { success: false, error: 'Item text is required' };
+
+  var sheet = getSheet(SHEETS.PENDING);
+  var headers = sheet.getDataRange().getValues()[0] || [];
+  if (headers.length === 0 || headers[0] !== 'id') {
+    sheet.clear();
+    sheet.getRange(1,1,1,6).setValues([['id','text','assignedTo','completed','createdBy','createdAt']]);
+  }
+
+  var assignedTo = String(params.assignedTo || '');
+  sheet.appendRow([new Date().getTime().toString(), text, assignedTo, 'false', user.employeeId, new Date().toISOString()]);
+  return { success: true };
+}
+
+function handleUpdatePendingItem(params, authUser) {
+  var user = authenticate(params);
+  if (!user) return { success: false, error: 'Authentication required' };
+
+  var itemId = String(params.id || '');
+  var completed = params.completed !== undefined ? String(params.completed) : null;
+  var text = String(params.text || '');
+
+  var sheet = getSheet(SHEETS.PENDING);
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === itemId) {
+      if (completed !== null) sheet.getRange(i+1, 4).setValue(completed);
+      if (text) sheet.getRange(i+1, 2).setValue(text);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Item not found' };
+}
+
+function handleDeletePendingItem(params, authUser) {
+  var itemId = String(params.id || '');
+  var sheet = getSheet(SHEETS.PENDING);
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === itemId) {
+      sheet.deleteRow(i+1);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Item not found' };
+}
+
+// ============================================================
+// ATTENDANCE & OT REPORTING
+// ============================================================
+
+function handleGetAttendance(params) {
+  var user = authenticate(params);
+  if (!user) return { success: false, error: 'Authentication required' };
+
+  var targetId = params.employeeId || user.employeeId;
+  var filterDate = params.date || '';
+
+  // Employees see only their own
+  if (user.role === 'Employee' && String(targetId) !== String(user.employeeId)) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  var sheet = getSheet(SHEETS.ATTENDANCE);
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return { success: true, data: [] };
+
+  var headers = data[0];
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) !== String(targetId)) continue;
+    if (filterDate && String(data[i][1]) !== filterDate) continue;
+    var row = {};
+    for (var j = 0; j < headers.length; j++) {
+      row[headers[j]] = (j < data[i].length) ? data[i][j] : '';
+    }
+    rows.push(row);
+  }
+  return { success: true, data: rows };
+}
+
+function handleUpdateAttendance(params, authUser) {
+  var rowIndex = parseInt(params.rowIndex, 10);
+  var field = String(params.field || '');
+  var value = String(params.value || '');
+
+  if (isNaN(rowIndex) || rowIndex < 2) return { success: false, error: 'Invalid row' };
+  if (!field) return { success: false, error: 'Field required' };
+
+  var sheet = getSheet(SHEETS.ATTENDANCE);
+  var headers = sheet.getDataRange().getValues()[0];
+  var colIndex = headers.indexOf(field);
+  if (colIndex < 0) return { success: false, error: 'Field not found' };
+
+  sheet.getRange(rowIndex, colIndex + 1).setValue(value);
+  return { success: true };
+}
+
+function parseAttendanceForReport(employeeId, month, year) {
+  month = parseInt(month, 10);
+  year = parseInt(year, 10);
+
+  // Get employee
+  var employee = findEmployeeById(employeeId);
+
+  // Get roster for the month
+  var rosterSheet = getSheet(SHEETS.ROSTER);
+  var rosterData = rosterSheet.getDataRange().getValues();
+  var rosterMap = {};
+  for (var i = 1; i < rosterData.length; i++) {
+    var rDate = String(rosterData[i][0] || '');
+    if (rDate) rosterMap[rDate] = {
+      morning: String(rosterData[i][2] || ''),
+      evening: String(rosterData[i][3] || ''),
+      night: String(rosterData[i][4] || '')
+    };
+  }
+
+  // Get login/logout for this employee
+  var attSheet = getSheet(SHEETS.ATTENDANCE);
+  var attData = attSheet.getDataRange().getValues();
+  var attMap = {};
+  for (var i = 1; i < attData.length; i++) {
+    if (String(attData[i][0]) === String(employeeId) && String(attData[i][2]) === 'login') {
+      var logDate = String(attData[i][1] || '');
+      attMap[logDate] = attMap[logDate] || {};
+      attMap[logDate].login = String(attData[i][3] || '');
+    }
+    if (String(attData[i][0]) === String(employeeId) && String(attData[i][2]) === 'logout') {
+      var logDate = String(attData[i][1] || '');
+      attMap[logDate] = attMap[logDate] || {};
+      attMap[logDate].logout = String(attData[i][3] || '');
+    }
+  }
+
+  var daysInMonth = new Date(year, month, 0).getDate();
+  var results = [];
+
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateStr = year + '-' + ('0' + month).slice(-2) + '-' + ('0' + d).slice(-2);
+    var roster = rosterMap[dateStr];
+    var att = attMap[dateStr];
+
+    var assigned = '';
+    var rosterTime = '';
+    var loginTime = att ? att.login : '';
+    var logoutTime = att ? att.logout : '';
+    var status = 'n/a';
+    var totalHours = 0;
+    var otHours = 0;
+
+    if (roster) {
+      if (roster.morning && roster.morning !== 'OFF' && roster.morning !== 'HOLIDAY') {
+        assigned = roster.morning; rosterTime = '7:00';
+      } else if (roster.evening && roster.evening !== 'OFF' && roster.evening !== 'HOLIDAY') {
+        assigned = roster.evening; rosterTime = '15:00';
+      } else if (roster.night && roster.night !== 'OFF' && roster.night !== 'HOLIDAY') {
+        assigned = roster.night; rosterTime = '23:00';
+      }
+    }
+
+    if (assigned && assigned.indexOf(String(employeeId)) >= 0) {
+      if (loginTime) {
+        var rosterMin = timeToMinutes(rosterTime);
+        var loginMin = timeToMinutes(loginTime);
+        var late = loginMin - rosterMin;
+
+        if (late > 15) {
+          status = 'Late (' + late + ' min)';
+        } else {
+          status = 'On Time';
+        }
+
+        if (logoutTime) {
+          var loginH = parseInt(loginTime.split(':')[0], 10);
+          var loginM = parseInt(loginTime.split(':')[1], 10);
+          var outH = parseInt(logoutTime.split(':')[0], 10);
+          var outM = parseInt(logoutTime.split(':')[1], 10);
+          var totalMin = (outH * 60 + outM) - (loginH * 60 + loginM);
+          if (totalMin < 0) totalMin += 1440;
+          totalHours = Math.round(totalMin / 60 * 100) / 100;
+          otHours = Math.max(0, totalHours - 8);
+          if (otHours < 1) otHours = 0;
+          else otHours = Math.floor(otHours);
+        }
+      } else {
+        status = 'Absent';
+      }
+    }
+
+    results.push({
+      date: dateStr,
+      rosterTime: rosterTime,
+      loginTime: loginTime,
+      logoutTime: logoutTime,
+      status: status,
+      totalHours: totalHours,
+      otHours: otHours
+    });
+  }
+
+  return results;
+}
+
+function handleRecordAttendance(params, authUser) {
+  var empId = String(params.employeeId || '');
+  var logDate = String(params.date || '');
+  var loginTime = String(params.loginTime || '');
+  var logoutTime = String(params.logoutTime || '');
+  if (!empId || !logDate || !loginTime || !logoutTime) {
+    return { success: false, error: 'Employee ID, date, login and logout times required' };
+  }
+  var sheet = getSheet(SHEETS.ATTENDANCE);
+  sheet.appendRow([empId, logDate, 'login', loginTime, new Date().toISOString(), 'manual']);
+  sheet.appendRow([empId, logDate, 'logout', logoutTime, new Date().toISOString(), 'manual']);
+  return { success: true };
+}
+
+function handleGetAttendanceReport(params, authUser) {
+  var employeeId = String(params.employeeId || '');
+  var month = parseInt(params.month, 10) || (new Date().getMonth() + 1);
+  var year = parseInt(params.year, 10) || new Date().getFullYear();
+
+  if (employeeId) {
+    var report = parseAttendanceForReport(employeeId, month, year);
+    return { success: true, data: report };
+  }
+
+  // All employees
+  var allUsers = getAllEmployeesRaw();
+  var allReports = {};
+  for (var i = 0; i < allUsers.length; i++) {
+    var id = String(allUsers[i][0]);
+    if (id === '1101' || allUsers[i][4] === 'Deleted') continue;
+    allReports[id] = parseAttendanceForReport(id, month, year);
+  }
+  return { success: true, data: allReports };
+}
+
+function handleGetOTReport(params, authUser) {
+  var employeeId = String(params.employeeId || '');
+  var month = parseInt(params.month, 10) || (new Date().getMonth() + 1);
+  var year = parseInt(params.year, 10) || new Date().getFullYear();
+
+  if (employeeId) {
+    var report = parseAttendanceForReport(employeeId, month, year);
+    return { success: true, data: report };
+  }
+
+  var allUsers = getAllEmployeesRaw();
+  var allReports = {};
+  for (var i = 0; i < allUsers.length; i++) {
+    var id = String(allUsers[i][0]);
+    if (id === '1101' || allUsers[i][4] === 'Deleted') continue;
+    allReports[id] = parseAttendanceForReport(id, month, year);
+  }
+  return { success: true, data: allReports };
+}
+
+function getAllEmployeesRaw() {
+  var sheet = getSheet(SHEETS.USERS);
+  return sheet.getDataRange().getValues();
+}
+
+function timeToMinutes(t) {
+  if (!t) return 0;
+  var parts = t.split(':');
+  return parseInt(parts[0], 10) * 60 + parseInt(parts[1] || 0, 10);
+}
+
+// ============================================================
 // SESSION MANAGEMENT
 // ============================================================
 
@@ -705,6 +1111,13 @@ function buildUserObject(headers, row) {
   obj.username = String(obj.username);
   delete obj.password;
   return obj;
+}
+
+function formatDateObj(d) {
+  var y = d.getFullYear();
+  var m = ('0' + (d.getMonth() + 1)).slice(-2);
+  var day = ('0' + d.getDate()).slice(-2);
+  return y + '-' + m + '-' + day;
 }
 
 function getNextId() {
@@ -1001,6 +1414,27 @@ function setup() {
   noticesSheet.clear();
   noticesSheet.getRange(1, 1, 1, 4).setValues([[
     'id', 'icon', 'text', 'createdAt'
+  ]]);
+
+  var flashSheet = getSheet(SHEETS.FLASH);
+  flashSheet.clear();
+  flashSheet.getRange(1, 1, 1, 5).setValues([[
+    'id', 'text', 'active', 'createdBy', 'createdAt'
+  ]]);
+  flashSheet.appendRow(['1', 'Ensure FN delivery is done within 12 hours', 'true', '1101', new Date().toISOString()]);
+  flashSheet.appendRow(['2', 'Make sure nothing is pending in 3D side', 'true', '1101', new Date().toISOString()]);
+  flashSheet.appendRow(['3', 'Double check priorities before leaving', 'true', '1101', new Date().toISOString()]);
+
+  var pendingSheet = getSheet(SHEETS.PENDING);
+  pendingSheet.clear();
+  pendingSheet.getRange(1, 1, 1, 6).setValues([[
+    'id', 'text', 'assignedTo', 'completed', 'createdBy', 'createdAt'
+  ]]);
+
+  var attSheet = getSheet(SHEETS.ATTENDANCE);
+  attSheet.clear();
+  attSheet.getRange(1, 1, 1, 6).setValues([[
+    'employeeId', 'date', 'type', 'time', 'timestamp', 'note'
   ]]);
 
   var sessionsSheet = getSheet(SHEETS.SESSIONS);

@@ -6,6 +6,7 @@
     <title>CS Roster - Employee Management</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary: #667eea;
@@ -338,14 +339,35 @@
                     <div class="mp-item"><div class="mp-val">-</div><div class="mp-lbl">Night</div></div>
                 </div>
             </div>
-            <div class="card flash-box" id="homeFlash">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                <span>Priorities set for the day</span>
+            <div class="card" id="homeFlashCard">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <div style="font-size:14px;font-weight:600;color:var(--text-main)"><i class="fa-solid fa-bullhorn" style="color:var(--warning)"></i> Priority Flash</div>
+                    <div id="flashAdminControls" style="display:none">
+                        <button class="btn-secondary btn-sm" onclick="showAddFlash()"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                </div>
+                <div id="flashCarousel" class="flash-box" style="padding:12px 15px;font-size:13px;animation:none;justify-content:flex-start">
+                    <span id="flashText">Loading...</span>
+                </div>
+                <div id="flashEditArea" style="display:none;margin-top:10px">
+                    <div class="two-col" style="gap:8px">
+                        <input class="form-input" id="flashNewText" placeholder="New flash message" style="font-size:13px">
+                        <button class="submit-btn" style="padding:8px 16px;font-size:13px" onclick="saveFlashMessage()">Add</button>
+                    </div>
+                    <div id="flashList" style="margin-top:8px;font-size:13px"></div>
+                </div>
             </div>
         </div>
         <div class="card">
-            <h2><i class="fa-solid fa-bullhorn" style="color:#fda085"></i> Live Notices</h2>
-            <ul class="notice-list" id="homeNotices"><li style="text-align:center;color:#cbd5e0">Loading...</li></ul>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <h2 style="margin:0;font-size:18px"><i class="fa-solid fa-list-check" style="color:#667eea"></i> Pending Items</h2>
+                <button class="btn-secondary btn-sm" onclick="showAddPendingItem()"><i class="fa-solid fa-plus"></i> Add</button>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+                <input class="form-input" id="pendingInput" placeholder="Add a pending item..." style="display:none;font-size:13px" onkeydown="if(event.key==='Enter')addPendingItem()">
+                <select class="form-select" id="pendingAssignee" style="display:none;font-size:13px;width:auto"><option value="">Anyone</option></select>
+            </div>
+            <ul class="notice-list" id="pendingItemList"><li style="text-align:center;color:#cbd5e0">Loading...</li></ul>
         </div>
     </div>
 
@@ -568,28 +590,41 @@
         </div>
     </div>
 
-    <!-- === PAGE: OT === -->
+    <!-- === PAGE: ATTENDANCE & OT === -->
     <div id="page-ot" class="page-content">
         <div class="card">
-            <h2><i class="fa-solid fa-stopwatch"></i> OT Log</h2>
-            <div class="two-col">
-                <div class="form-group"><label class="form-label">Employee</label><select class="form-select" id="ot_empId"><option value="">Select...</option></select></div>
-                <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="ot_date"></div>
-                <div class="form-group"><label class="form-label">Roster Start (Auto)</label><input class="form-input" id="ot_rosterIn" readonly placeholder="Select employee + date"></div>
-                <div class="form-group"><label class="form-label">Actual In Time</label><input type="time" class="form-input" id="ot_actualIn" onchange="calcOT()"></div>
-                <div class="form-group"><label class="form-label">Actual Out Time</label><input type="time" class="form-input" id="ot_actualOut" onchange="calcOT()"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+                <h2 style="margin:0"><i class="fa-solid fa-clipboard-list"></i> Attendance &amp; OT</h2>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn-secondary btn-sm" onclick="downloadOTReport()"><i class="fa-solid fa-download"></i> OT Report</button>
+                    <button class="btn-secondary btn-sm" onclick="downloadAttendanceReport()"><i class="fa-solid fa-download"></i> Attendance Report</button>
+                </div>
             </div>
-            <div id="otResult" style="display:none"></div>
-            <button class="submit-btn" onclick="logOT()"><i class="fa-solid fa-plus"></i> Log Entry</button>
-            <div id="otMsg" style="margin-top:10px;font-size:13px"></div>
+            <div class="filter-bar" style="margin-top:15px">
+                <select id="att_empId" onchange="loadAttendance()"><option value="">Select Employee...</option></select>
+                <select id="att_month" onchange="loadAttendance()">
+                    <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+                    <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+                    <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+                    <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+                </select>
+                <input type="number" id="att_year" value="2026" style="width:80px" onchange="loadAttendance()">
+                <span style="font-size:12px;color:var(--text-light)" id="attSummary"></span>
+            </div>
+            <div class="table-container" style="max-height:500px;overflow-y:auto">
+                <table><thead><tr><th>Date</th><th>Roster</th><th>Login</th><th>Logout</th><th>Status</th><th>Hrs</th><th>OT</th></tr></thead><tbody id="attBody"><tr><td colspan="7" class="text-center" style="color:#a0aec0;padding:30px">Select an employee and month</td></tr></tbody></table>
+            </div>
         </div>
-        <div class="card">
-            <h3 style="font-size:16px;margin:0 0 12px">OT History</h3>
-            <div class="filter-bar">
-                <select id="ot_historyEmp" onchange="loadOTHistory()"><option value="">All Employees</option></select>
-                <input type="date" id="ot_historyDate" onchange="loadOTHistory()">
+        <div class="card" id="attLogCard" style="display:none">
+            <h3 style="font-size:15px;margin:0 0 10px"><i class="fa-solid fa-clock"></i> Manual Log Entry</h3>
+            <div class="two-col">
+                <div class="form-group"><label class="form-label">Employee</label><select class="form-select" id="attLogEmp"></select></div>
+                <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="attLogDate"></div>
+                <div class="form-group"><label class="form-label">Login Time</label><input type="time" class="form-input" id="attLogIn"></div>
+                <div class="form-group"><label class="form-label">Logout Time</label><input type="time" class="form-input" id="attLogOut"></div>
             </div>
-            <div class="table-container"><table><thead><tr><th>Date</th><th>Employee</th><th>Roster</th><th>In</th><th>Out</th><th>Total</th><th>OT</th></tr></thead><tbody id="otHistoryBody"><tr><td colspan="7" class="text-center" style="color:#a0aec0">Loading...</td></tr></tbody></table></div>
+            <button class="submit-btn" onclick="manualLogAttendance()"><i class="fa-solid fa-plus"></i> Log Entry</button>
+            <div id="attLogMsg" style="margin-top:8px;font-size:13px"></div>
         </div>
     </div>
 
@@ -765,7 +800,8 @@ async function initApp(mustChangePw) {
     setupNav();
     updateHome();
     loadRosterData();
-    loadNotices();
+    loadPendingItems();
+    loadFlashMessages();
     populateEmployeeDropdowns();
 
     // Check manpower
@@ -774,23 +810,6 @@ async function initApp(mustChangePw) {
     // Date display
     const d = new Date();
     document.getElementById('homeDate').textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'long' });
-
-    // Flash messages
-    const msgs = [
-        'Ensure FN delivery is done within 12 hours',
-        'Make sure nothing is pending in 3D side',
-        'Double check priorities before leaving'
-    ];
-    let i = 0;
-    const flashEl = document.getElementById('homeFlash').querySelector('span');
-    setInterval(() => {
-        i = (i + 1) % msgs.length;
-        flashEl.style.opacity = 0;
-        setTimeout(() => {
-            flashEl.textContent = msgs[i];
-            flashEl.style.opacity = 1;
-        }, 300);
-    }, 4000);
 
     switchPage('home');
 }
@@ -1560,70 +1579,278 @@ async function loadOTHistory() {
 // ============================================================
 // NOTICES
 // ============================================================
-async function loadNotices() {
-    const result = await callAPI('getNotices');
+// ============================================================
+// FLASH MESSAGES
+// ============================================================
+let flashMessages = [];
+let flashIndex = 0;
+let flashInterval = null;
+
+async function loadFlashMessages() {
+    const result = await callAPI('getFlashMessages');
+    if (!result.success || !result.data) return;
+    flashMessages = result.data.filter(m => m.active === 'true');
+    const el = document.getElementById('flashText');
+
+    if (flashMessages.length === 0) {
+        el.textContent = 'No priorities set';
+        return;
+    }
+
+    flashIndex = 0;
+    el.textContent = flashMessages[0].text;
+    if (flashInterval) clearInterval(flashInterval);
+    flashInterval = setInterval(() => {
+        flashIndex = (flashIndex + 1) % flashMessages.length;
+        el.textContent = flashMessages[flashIndex].text;
+    }, 4000);
+
+    // Show admin controls
+    const adminCtrl = document.getElementById('flashAdminControls');
+    if (adminCtrl) adminCtrl.style.display = isAdminUser() ? 'block' : 'none';
+}
+
+function showAddFlash() {
+    const area = document.getElementById('flashEditArea');
+    area.style.display = area.style.display === 'none' ? 'block' : 'none';
+    if (area.style.display === 'block') renderFlashList();
+}
+
+async function renderFlashList() {
+    const result = await callAPI('getFlashMessages');
     if (!result.success) return;
-
-    const list = document.getElementById('homeNotices');
-    const ntList = document.getElementById('ntList');
-
-    const notices = result.data || [];
-    if (notices.length === 0) {
-        list.innerHTML = '<li style="color:#a0aec0;text-align:center">No notices</li>';
-        if (ntList) ntList.innerHTML = '<li style="color:#a0aec0;text-align:center">No notices</li>';
-        return;
-    }
-
-    const renderNotice = (n) => {
-        const icons = { info: 'fa-solid fa-circle-info', warning: 'fa-solid fa-triangle-exclamation', dropbox: 'fa-brands fa-dropbox', fire: 'fa-solid fa-fire' };
-        const colors = { info: '#3b82f6', warning: '#f59e0b', dropbox: '#0061fe', fire: '#ef4444' };
-        const icon = icons[n.icon] || 'fa-solid fa-circle-info';
-        const color = colors[n.icon] || '#667eea';
-        return `<li><span class="bullet" style="color:${color}"><i class="${icon}"></i></span><span>${n.text}</span></li>`;
-    };
-
-    list.innerHTML = notices.map(renderNotice).join('');
-    if (ntList && ntList !== list) ntList.innerHTML = notices.map(renderNotice).join('');
+    const list = document.getElementById('flashList');
+    list.innerHTML = result.data.map(m => `
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #edf2f7">
+            <input type="checkbox" ${m.active==='true'?'checked':''} onchange="toggleFlash('${m.id}',this.checked)">
+            <span style="flex:1;${m.active!=='true'?'text-decoration:line-through;color:#a0aec0':''}">${m.text}</span>
+            <button class="btn-danger btn-sm" onclick="deleteFlash('${m.id}')"><i class="fa-solid fa-trash"></i></button>
+        </div>
+    `).join('');
 }
 
-async function loadNoticesPage() {
-    const result = await callAPI('getNotices');
-    const list = document.getElementById('ntList');
-    if (!result.success) { list.innerHTML = '<li style="color:var(--danger)">Error</li>'; return; }
+async function toggleFlash(id, active) {
+    await callAPI('updateFlashMessage', { id, active: active.toString() });
+    loadFlashMessages();
+    renderFlashList();
+}
 
-    const notices = result.data || [];
-    if (notices.length === 0) {
-        list.innerHTML = '<li style="color:#a0aec0;text-align:center">No notices</li>';
+async function deleteFlash(id) {
+    await callAPI('deleteFlashMessage', { id });
+    loadFlashMessages();
+    renderFlashList();
+}
+
+async function saveFlashMessage() {
+    const text = document.getElementById('flashNewText').value.trim();
+    if (!text) return;
+    await callAPI('addFlashMessage', { text });
+    document.getElementById('flashNewText').value = '';
+    loadFlashMessages();
+    renderFlashList();
+}
+
+// ============================================================
+// PENDING ITEMS
+// ============================================================
+async function loadPendingItems() {
+    const result = await callAPI('getPendingItems');
+    if (!result.success) return;
+    const list = document.getElementById('pendingItemList');
+    const items = result.data || [];
+
+    if (items.length === 0) {
+        list.innerHTML = '<li style="text-align:center;color:#a0aec0;font-style:italic">No pending items</li>';
         return;
     }
 
-    const icons = { info: 'fa-solid fa-circle-info', warning: 'fa-solid fa-triangle-exclamation', dropbox: 'fa-brands fa-dropbox', fire: 'fa-solid fa-fire' };
-    const colors = { info: '#3b82f6', warning: '#f59e0b', dropbox: '#0061fe', fire: '#ef4444' };
+    list.innerHTML = items.map(item => `
+        <li style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #edf2f7">
+            <input type="checkbox" ${item.completed==='true'?'checked':''} onchange="togglePendingItem('${item.id}',this.checked)" style="width:18px;height:18px;cursor:pointer">
+            <span style="flex:1;${item.completed==='true'?'text-decoration:line-through;color:#a0aec0':''}">${item.text}</span>
+            ${item.assignedTo ? `<span style="font-size:11px;color:var(--text-light);background:#f1f5f9;padding:2px 8px;border-radius:10px">${item.assignedTo}</span>` : ''}
+            <span style="font-size:11px;color:${item.completed==='true'?'var(--success)':'var(--warning)'}">${item.completed==='true'?'✓ Done':'Pending'}</span>
+        </li>
+    `).join('');
+}
 
-    list.innerHTML = notices.map(n => {
-        const icon = icons[n.icon] || 'fa-solid fa-circle-info';
-        const color = colors[n.icon] || '#667eea';
-        return `<li><span class="bullet" style="color:${color}"><i class="${icon}"></i></span><span>${n.text}</span></li>`;
+function showAddPendingItem() {
+    const input = document.getElementById('pendingInput');
+    const assignee = document.getElementById('pendingAssignee');
+    input.style.display = input.style.display === 'none' ? 'inline-block' : 'none';
+    assignee.style.display = assignee.style.display === 'none' ? 'inline-block' : 'none';
+    if (input.style.display !== 'none') input.focus();
+}
+
+async function addPendingItem() {
+    const text = document.getElementById('pendingInput').value.trim();
+    const assignedTo = document.getElementById('pendingAssignee').value;
+    if (!text) return;
+    await callAPI('addPendingItem', { text, assignedTo });
+    document.getElementById('pendingInput').value = '';
+    document.getElementById('pendingInput').style.display = 'none';
+    document.getElementById('pendingAssignee').style.display = 'none';
+    loadPendingItems();
+}
+
+async function togglePendingItem(id, completed) {
+    await callAPI('updatePendingItem', { id, completed: completed.toString() });
+    loadPendingItems();
+}
+
+// ============================================================
+// ATTENDANCE & OT
+// ============================================================
+async function loadAttendance() {
+    const empId = document.getElementById('att_empId').value;
+    const month = document.getElementById('att_month').value;
+    const year = document.getElementById('att_year').value;
+    const tbody = document.getElementById('attBody');
+
+    if (!empId) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="color:#a0aec0;padding:30px">Select an employee</td></tr>';
+        return;
+    }
+
+    const result = await callAPI('getAttendanceReport', { employeeId: empId, month, year });
+    if (!result.success) { tbody.innerHTML = '<tr><td colspan="7" style="color:var(--danger)">Error</td></tr>'; return; }
+
+    const data = result.data || [];
+    let totalOT = 0;
+    let totalHrs = 0;
+    let lateDays = 0;
+    let absentDays = 0;
+    let presentDays = 0;
+
+    tbody.innerHTML = data.map(d => {
+        const hrs = parseFloat(d.totalHours) || 0;
+        const ot = parseFloat(d.otHours) || 0;
+        totalHrs += hrs;
+        totalOT += ot;
+        if (d.status === 'Absent') absentDays++;
+        else if (d.status && d.status.includes('Late')) lateDays++;
+        else if (d.status === 'On Time') presentDays++;
+
+        let statusClass = 'on-time-tag';
+        let statusText = d.status || 'n/a';
+        if (d.status === 'Absent') { statusClass = 'late-tag'; statusText = '❌ Absent'; }
+        else if (d.status && d.status.includes('Late')) { statusClass = 'late-tag'; statusText = '⚠️ ' + d.status; }
+        else if (d.status === 'On Time') { statusClass = 'on-time-tag'; statusText = '✔ On Time'; }
+        else if (d.status === 'n/a' || !d.status) { statusClass = ''; statusText = '-'; }
+
+        return `<tr>
+            <td>${d.date}</td>
+            <td>${d.rosterTime || '-'}</td>
+            <td>${d.loginTime || '-'}</td>
+            <td>${d.logoutTime || '-'}</td>
+            <td><span class="${statusClass}">${statusText}</span></td>
+            <td>${hrs > 0 ? hrs + 'h' : '-'}</td>
+            <td>${ot > 0 ? '<span class="ot-tag">+' + ot + 'h</span>' : '-'}</td>
+        </tr>`;
     }).join('');
+
+    document.getElementById('attSummary').textContent =
+        `Present: ${presentDays} | Late: ${lateDays} | Absent: ${absentDays} | Total Hrs: ${totalHrs.toFixed(1)} | Total OT: ${totalOT}h`;
+    document.getElementById('attLogCard').style.display = isAdminUser() ? 'block' : 'none';
 }
 
-async function addNotice() {
-    const text = document.getElementById('nt_text').value.trim();
-    const icon = document.getElementById('nt_icon').value;
-    const msg = document.getElementById('ntMsg');
+async function manualLogAttendance() {
+    const empId = document.getElementById('attLogEmp').value;
+    const date = document.getElementById('attLogDate').value;
+    const login = document.getElementById('attLogIn').value;
+    const logout = document.getElementById('attLogOut').value;
+    const msg = document.getElementById('attLogMsg');
 
-    if (!text) { msg.textContent = 'Enter notice text'; msg.style.color = 'var(--danger)'; return; }
+    if (!empId || !date || !login || !logout) {
+        msg.textContent = 'Fill all fields'; msg.style.color = 'var(--danger)'; return;
+    }
 
-    const result = await callAPI('addNotice', { text, icon });
+    const result = await callAPI('recordAttendance', { employeeId: empId, date, loginTime: login, logoutTime: logout });
     if (!result.success) { msg.textContent = result.error; msg.style.color = 'var(--danger)'; return; }
 
-    msg.textContent = 'Notice added!';
+    msg.textContent = 'Attendance logged!';
     msg.style.color = 'var(--success)';
-    document.getElementById('nt_text').value = '';
-    loadNoticesPage();
-    loadNotices();
-    setTimeout(() => { msg.textContent = ''; }, 3000);
+    document.getElementById('attLogIn').value = '';
+    document.getElementById('attLogOut').value = '';
+    loadAttendance();
+    setTimeout(() => msg.textContent = '', 3000);
 }
+
+// ============================================================
+// DOWNLOAD REPORTS (XLSX via SheetJS)
+// ============================================================
+async function downloadOTReport() {
+    const empId = document.getElementById('att_empId').value;
+    const month = document.getElementById('att_month').value;
+    const year = document.getElementById('att_year').value;
+    if (!empId) { showToast('Select an employee first', 'error'); return; }
+
+    const result = await callAPI('getAttendanceReport', { employeeId: empId, month, year });
+    if (!result.success || !result.data) return;
+
+    const data = result.data;
+    const emp = STATE.employees.find(e => e.employeeId === empId);
+    const empName = emp ? emp.fullName || emp.employeeId : empId;
+
+    // Build data array matching the Over Time template
+    const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(month)-1];
+
+    const wsData = [
+        [`TUUO Solutions Limited\nOver Time ${monthName}_${year}`],
+        ['SL', 'Name', 'ID'],
+        ['Date', ...data.map(d => parseInt(d.date.split('-')[2], 10)), 'Total OT', 'OT - Hrs'],
+        ['Day', ...data.map(d => {
+            const dt = new Date(d.date);
+            return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()];
+        }), monthName, 'Notes'],
+        [1, empName, empId, ...data.map(d => d.otHours > 0 ? d.otHours : ''), data.reduce((s,d) => s + (parseFloat(d.otHours)||0), 0), '']
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, `${monthName}-${year}`);
+    XLSX.writeFile(wb, `Over_Time_${monthName}_${year}_${empId}.xlsx`);
+    showToast('OT report downloaded', 'success');
+}
+
+async function downloadAttendanceReport() {
+    const empId = document.getElementById('att_empId').value;
+    const month = document.getElementById('att_month').value;
+    const year = document.getElementById('att_year').value;
+    if (!empId) { showToast('Select an employee first', 'error'); return; }
+
+    const result = await callAPI('getAttendanceReport', { employeeId: empId, month, year });
+    if (!result.success || !result.data) return;
+
+    const data = result.data;
+    const emp = STATE.employees.find(e => e.employeeId === empId);
+    const empName = emp ? emp.fullName || emp.employeeId : empId;
+
+    const monthName = ['January','February','March','April','May','June','July','August','September','October','November','December'][parseInt(month)-1];
+
+    // Build attendance data (1 for leave/absent, 0 for present)
+    const wsData = [
+        [`TUUO Solutions Limited\nLeave Tracker ${monthName}_${year}`],
+        ['SL', 'Name', 'ID'],
+        ['Date', ...data.map(d => parseInt(d.date.split('-')[2], 10)), 'Total Leave', 'Total Absent'],
+        ['Day', ...data.map(d => {
+            const dt = new Date(d.date);
+            return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()];
+        }), monthName, monthName],
+        [1, empName, empId, ...data.map(d => d.status === 'Absent' ? 1 : (d.status && d.status.includes('Late') ? 1 : 0)),
+         data.filter(d => d.status === 'Absent' || (d.status && d.status.includes('Late'))).length,
+         data.filter(d => d.status === 'Absent').length]
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, `${monthName}-${year}`);
+    XLSX.writeFile(wb, `Leave_Absent_Report_${monthName}_${year}_${empId}.xlsx`);
+    showToast('Attendance report downloaded', 'success');
+}
+
+// Need to remove the setInterval for flash messages from initApp since we handle it in loadFlashMessages
+// Also the old flash message code in initApp
 
 // ============================================================
 // HOLIDAYS PAGE
@@ -1716,6 +1943,28 @@ async function populateEmployeeDropdowns() {
     if (!result.success) return;
     STATE.employees = result.data;
 
+    // Populate attendance employee dropdown
+    const attSel = document.getElementById('att_empId');
+    if (attSel) {
+        attSel.innerHTML = '<option value="">Select Employee...</option>';
+        const attLogEmp = document.getElementById('attLogEmp');
+        if (attLogEmp) attLogEmp.innerHTML = '<option value="">Select...</option>';
+        result.data.forEach(e => {
+            const label = `${e.fullName || ''} (${e.employeeId})`;
+            attSel.innerHTML += `<option value="${e.employeeId}">${label}</option>`;
+            if (attLogEmp) attLogEmp.innerHTML += `<option value="${e.employeeId}">${label}</option>`;
+        });
+    }
+
+    // Populate pending items assignee
+    const pendSel = document.getElementById('pendingAssignee');
+    if (pendSel) {
+        result.data.forEach(e => {
+            const label = `${e.fullName || ''} (${e.employeeId})`;
+            pendSel.innerHTML += `<option value="${e.employeeId}">${label}</option>`;
+        });
+    }
+
     // Also populate OT employee dropdown if already loaded
     const otSel = document.getElementById('ot_empId');
     if (otSel && otSel.options.length <= 1) {
@@ -1724,10 +1973,12 @@ async function populateEmployeeDropdowns() {
             otSel.innerHTML += `<option value="${e.employeeId}">${label}</option>`;
         });
         const histSel = document.getElementById('ot_historyEmp');
-        result.data.forEach(e => {
-            const label = `${e.fullName || ''} (${e.employeeId})`;
-            histSel.innerHTML += `<option value="${e.employeeId}">${label}</option>`;
-        });
+        if (histSel) {
+            result.data.forEach(e => {
+                const label = `${e.fullName || ''} (${e.employeeId})`;
+                histSel.innerHTML += `<option value="${e.employeeId}">${label}</option>`;
+            });
+        }
     }
 }
 
