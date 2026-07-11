@@ -271,55 +271,7 @@
         .gap-10{gap:10px}
         .items-center{align-items:center}
 
-        /* === ENTRY SPLASH === */
-        #splashLetters {
-            text-align: center;
-            position: absolute;
-            top: 40%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10;
-        }
-        .splash-letter {
-            font-size: 130px;
-            font-weight: 900;
-            font-family: 'Poppins', sans-serif;
-            display: inline-block;
-            opacity: 0;
-            transform: translateY(-100vh);
-            animation: letterDrop 0.9s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
-            text-shadow: 0 0 40px rgba(255,255,255,0.12);
-            letter-spacing: 12px;
-        }
-        .splash-letter:nth-child(odd) { color: #ffffff; }
-        .splash-letter:nth-child(even) { color: #C11C2C; }
-
-        @keyframes letterDrop {
-            0% { transform: translateY(-100vh); opacity: 0; }
-            65% { transform: translateY(10px); opacity: 1; }
-            80% { transform: translateY(-5px); }
-            100% { transform: translateY(0); opacity: 1; }
-        }
-
-        #loginCard {
-            opacity: 0;
-            transform: translateY(50px);
-        }
-        #loginOverlay.splash-done #loginCard {
-            animation: cardSlideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
-        }
-        #loginOverlay.splash-done #splashLetters {
-            animation: lettersRise 0.5s ease-in forwards;
-        }
-        @keyframes cardSlideUp {
-            from { opacity: 0; transform: translateY(50px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes lettersRise {
-            to { opacity: 0; transform: translateY(-30px) scale(0.9); }
-        }
-
-        /* === PARTICLE BACKGROUND === */
+        /* === ANIMATED BACKGROUND === */
         #particleBg {
             position: fixed;
             top: 0; left: 0;
@@ -342,76 +294,11 @@
             90% { opacity: 0.15; }
             100% { transform: translateY(-120vh) translateX(60px) scale(0.4); opacity: 0; }
         }
-
-        /* === PAGE TRANSITIONS === */
-        .page-content.page-exit {
-            display: block;
-            animation: pageExit 0.25s ease-in forwards;
-            pointer-events: none;
-        }
-        @keyframes pageExit {
-            to { opacity: 0; transform: translateY(-8px) scale(0.98); }
-        }
-        .page-content.page-enter {
-            animation: pageEnter 0.35s ease-out forwards;
-        }
-        @keyframes pageEnter {
-            from { opacity: 0; transform: translateY(16px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* === CARD STAGGER === */
-        .card-stagger {
-            animation: cardFadeUp 0.45s ease-out both;
-        }
-        @keyframes cardFadeUp {
-            from { opacity: 0; transform: translateY(16px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* === TOAST TOP-RIGHT === */
-        #toast {
-            top: 20px;
-            right: 20px;
-            left: auto;
-            bottom: auto;
-            transform: none;
-            border-radius: 12px;
-            padding: 14px 24px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-            min-width: auto;
-            white-space: nowrap;
-            font-family: 'Poppins', sans-serif;
-        }
-        #toast.show {
-            visibility: visible;
-            animation: toastSlideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1), toastFadeOutRight 0.4s ease-in 2.6s forwards;
-        }
-        #toast.toast-error { background: #ef4444; }
-        #toast.toast-success { background: #10b981; }
-        @keyframes toastSlideInRight {
-            from { transform: translateX(120%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes toastFadeOutRight {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(120%); opacity: 0; }
-        }
-
-        /* === SPLASH OVERLAY UPDATE === */
-        #loginOverlay {
-            background: #001a33;
-            animation: none;
-        }
     </style>
 </head>
 <body>
 
-<!-- === PARTICLE BACKGROUND === -->
+<!-- === ANIMATED BACKGROUND === -->
 <div id="particleBg">
     <div class="particle" style="left:5%;width:3px;height:3px;animation-delay:0s;animation-duration:20s;background:rgba(255,200,100,0.35)"></div>
     <div class="particle" style="left:12%;width:5px;height:5px;animation-delay:1.5s;animation-duration:25s;background:rgba(255,180,80,0.3)"></div>
@@ -430,22 +317,16 @@
     <div class="particle" style="left:15%;width:4px;height:4px;animation-delay:8s;animation-duration:22s;background:rgba(255,230,170,0.2)"></div>
 </div>
 
-<!-- === SPLASH + LOGIN OVERLAY === -->
+<!-- === LOGIN OVERLAY === -->
 <div id="loginOverlay">
-    <div id="splashLetters">
-        <span class="splash-letter">T</span>
-        <span class="splash-letter">U</span>
-        <span class="splash-letter">U</span>
-        <span class="splash-letter">O</span>
-    </div>
-    <div class="login-card" id="loginCard">
+    <div class="login-card">
         <img src="https://drive.google.com/thumbnail?id=1wIYCPVlDADbSiTb_y8g11zpWzmwQvbf-&sz=w200" class="logo-img" alt="Logo">
         <h2>Employee Portal</h2>
-        <p>Customer Success - Roster Operations</p>
-        <input type="text" id="loginUser" class="form-input" placeholder="Username or Employee ID" autocomplete="off" onkeydown="if(event.key==='Enter')handleLogin()">
-        <input type="password" id="loginPass" class="form-input" placeholder="Password" autocomplete="off" onkeydown="if(event.key==='Enter')handleLogin()">
+        <p>Sign in to access the roster system</p>
+        <input type="text" id="loginUser" class="form-input" placeholder="Username or Employee ID" autocomplete="off">
+        <input type="password" id="loginPass" class="form-input" placeholder="Password" autocomplete="off">
+        <button class="submit-btn" id="loginBtn" onclick="handleLogin()">Sign In</button>
         <div class="login-error" id="loginError"></div>
-        <button class="submit-btn" id="loginBtn" onclick="handleLogin()"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
     </div>
 </div>
 
@@ -823,7 +704,7 @@
     </div>
 
     <!-- === TOAST === -->
-    <div id="toast"><i class="fa-solid fa-check-circle" id="toastIcon"></i><span id="toastMsg"></span></div>
+    <div id="toast"></div>
 </div>
 
 <script>
@@ -891,7 +772,6 @@ async function handleLogin() {
 
     document.getElementById('loginOverlay').classList.add('hidden');
     document.getElementById('appContainer').classList.add('show');
-    document.getElementById('particleBg').style.background = 'linear-gradient(180deg, #fffaf5 0%, #ffedd5 50%, #fef3c7 100%)';
 
     initApp(result.data.mustChangePassword);
 }
@@ -900,11 +780,9 @@ async function handleLogout() {
     await callAPI('logout', {});
     STATE.token = null;
     STATE.user = null;
-    STATE.currentPage = null;
     sessionStorage.clear();
     document.getElementById('appContainer').classList.remove('show');
     document.getElementById('loginOverlay').classList.remove('hidden');
-    document.getElementById('loginOverlay').classList.remove('splash-done');
     document.getElementById('loginUser').value = '';
     document.getElementById('loginPass').value = '';
     document.getElementById('loginError').textContent = '';
@@ -980,23 +858,12 @@ async function initApp(mustChangePw) {
 }
 
 window.onload = async function() {
-    // Check session during splash animation
-    const restoredPromise = checkSession();
-
-    // Splash plays for 2.8s before showing login or dashboard
-    setTimeout(async () => {
-        const restored = await restoredPromise;
-        if (restored) {
-            // Session valid - skip login card, go to dashboard
-            document.getElementById('loginOverlay').classList.add('hidden');
-            document.getElementById('appContainer').classList.add('show');
-            document.getElementById('particleBg').style.background = 'linear-gradient(180deg, #fffaf5 0%, #ffedd5 50%, #fef3c7 100%)';
-            initApp(false);
-        } else {
-            // Show login card
-            document.getElementById('loginOverlay').classList.add('splash-done');
-        }
-    }, 2800);
+    const restored = await checkSession();
+    if (restored) {
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('appContainer').classList.add('show');
+        initApp(false);
+    }
 };
 
 // ============================================================
@@ -1018,58 +885,27 @@ function setupNav() {
 }
 
 function switchPage(page) {
-    const oldPage = STATE.currentPage;
-    if (oldPage === page) return;
     STATE.currentPage = page;
 
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
 
-    // Exit old page
-    if (oldPage) {
-        const oldEl = document.getElementById('page-' + oldPage);
-        if (oldEl) {
-            oldEl.classList.remove('active');
-            oldEl.classList.add('page-exit');
-        }
+    document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
+    const pageEl = document.getElementById('page-' + page);
+    if (pageEl) pageEl.classList.add('active');
+
+    // Load page-specific data
+    switch (page) {
+        case 'profile': loadProfile(); break;
+        case 'directory': loadDirectory(); break;
+        case 'usermgmt': loadUserMgmt(); break;
+        case 'roster': renderRoster(); break;
+        case 'holidays': loadHolidaysPage(); break;
+        case 'leave': loadLeavePortal(); break;
+        case 'leave-approval': loadLeaveApprovals(); break;
+        case 'ot': loadOTPage(); break;
+        case 'notices': loadNoticesPage(); break;
     }
-
-    // Prepare new page
-    const newEl = document.getElementById('page-' + page);
-    if (newEl) {
-        newEl.classList.add('page-enter');
-    }
-
-    setTimeout(() => {
-        if (oldPage) {
-            const oldEl = document.getElementById('page-' + oldPage);
-            if (oldEl) oldEl.classList.remove('page-exit');
-        }
-        if (newEl) {
-            newEl.classList.remove('page-enter');
-            newEl.classList.add('active');
-            // Stagger cards
-            newEl.querySelectorAll('.card').forEach((card, i) => {
-                card.style.setProperty('--stagger-delay', (i * 80) + 'ms');
-                card.classList.remove('card-stagger');
-                void card.offsetWidth;
-                card.classList.add('card-stagger');
-            });
-        }
-
-        // Load page-specific data
-        switch (page) {
-            case 'profile': loadProfile(); break;
-            case 'directory': loadDirectory(); break;
-            case 'usermgmt': loadUserMgmt(); break;
-            case 'roster': renderRoster(); break;
-            case 'holidays': loadHolidaysPage(); break;
-            case 'leave': loadLeavePortal(); break;
-            case 'leave-approval': loadLeaveApprovals(); break;
-            case 'ot': loadOTPage(); break;
-            case 'notices': loadNoticesPage(); break;
-        }
-    }, 280);
 }
 
 // ============================================================
@@ -2348,21 +2184,10 @@ function isAdminUser() {
 
 function showToast(message, type) {
     const toast = document.getElementById('toast');
-    const icon = document.getElementById('toastIcon');
-    const msg = document.getElementById('toastMsg');
-    msg.textContent = message;
-    toast.className = '';
+    toast.textContent = message;
+    toast.style.background = type === 'error' ? '#ef4444' : '#333';
     toast.classList.add('show');
-    if (type === 'error') {
-        toast.classList.add('toast-error');
-        icon.className = 'fa-solid fa-circle-xmark';
-    } else {
-        toast.classList.add('toast-success');
-        icon.className = 'fa-solid fa-check-circle';
-    }
-    setTimeout(() => {
-        toast.classList.remove('show', 'toast-error', 'toast-success');
-    }, 3000);
+    setTimeout(() => toast.classList.remove('show'), 3000);
 }
 </script>
 
