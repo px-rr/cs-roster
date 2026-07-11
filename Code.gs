@@ -686,8 +686,23 @@ function findEmployeeById(id) {
 function buildUserObject(headers, row) {
   var obj = {};
   for (var j = 0; j < headers.length; j++) {
-    obj[headers[j]] = (j < row.length) ? row[j] : '';
+    var val = (j < row.length) ? row[j] : '';
+    // Convert Date objects to YYYY-MM-DD strings
+    if (Object.prototype.toString.call(val) === '[object Date]') {
+      if (!isNaN(val.getTime())) {
+        var y = val.getFullYear();
+        var m = ('0' + (val.getMonth() + 1)).slice(-2);
+        var d = ('0' + val.getDate()).slice(-2);
+        val = y + '-' + m + '-' + d;
+      } else {
+        val = '';
+      }
+    }
+    obj[headers[j]] = val;
   }
+  // Ensure ID fields are strings
+  obj.employeeId = String(obj.employeeId);
+  obj.username = String(obj.username);
   delete obj.password;
   return obj;
 }
