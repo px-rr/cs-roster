@@ -260,6 +260,10 @@
         .search-box{display:flex;gap:8px;align-items:center}
         .search-box input{padding:9px 14px;border:2px solid #e2e8f0;border-radius:10px;font-family:'Poppins',sans-serif;font-size:13px;width:250px}
         .search-box input:focus{outline:none;border-color:var(--primary)}
+        .month-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:10px;margin-bottom:20px}
+        .month-btn{background:#fff;border:1px solid #d1d5db;padding:12px;border-radius:8px;cursor:pointer;text-align:center;font-weight:600;transition:.2s;font-size:13px}
+        .month-btn:hover,.month-btn.active{background:#f3f4f6;border-color:var(--primary);color:var(--primary)}
+        #holidayDetails{background:#fffbeb;border-left:4px solid var(--warning);padding:20px;border-radius:8px;display:none}
         .mt-10{margin-top:10px}
         .mb-10{margin-bottom:10px}
         .flex{display:flex}
@@ -300,6 +304,7 @@
             <div class="nav-item" data-page="employee-form" onclick="switchPage('employee-form')" data-role="admin"><i class="fa-solid fa-user-plus"></i> New Employee</div>
             <div class="nav-item" data-page="usermgmt" onclick="switchPage('usermgmt')" data-role="super"><i class="fa-solid fa-shield"></i> Users</div>
             <div class="nav-item" data-page="roster" onclick="switchPage('roster')"><i class="fa-solid fa-calendar-days"></i> Roster</div>
+            <div class="nav-item" data-page="holidays" onclick="switchPage('holidays')"><i class="fa-solid fa-flag"></i> Holidays</div>
             <div class="nav-item" data-page="upload-roster" onclick="switchPage('upload-roster')" data-role="admin"><i class="fa-solid fa-upload"></i> Upload</div>
             <div class="nav-item" data-page="leave" onclick="switchPage('leave')"><i class="fa-solid fa-tree"></i> Leave</div>
             <div class="nav-item" data-page="leave-approval" onclick="switchPage('leave-approval')" data-role="admin"><i class="fa-solid fa-check-double"></i> Approvals</div>
@@ -495,6 +500,15 @@
             <div class="table-container">
                 <table><thead id="rosterHead"></thead><tbody id="rosterBody"></tbody></table>
             </div>
+        </div>
+    </div>
+
+    <!-- === PAGE: HOLIDAYS === -->
+    <div id="page-holidays" class="page-content">
+        <div class="card">
+            <h2><i class="fa-solid fa-flag"></i> Government Holidays 2026</h2>
+            <div class="month-grid" id="holidayMonthGrid"></div>
+            <div id="holidayDetails"></div>
         </div>
     </div>
 
@@ -824,6 +838,7 @@ function switchPage(page) {
         case 'directory': loadDirectory(); break;
         case 'usermgmt': loadUserMgmt(); break;
         case 'roster': renderRoster(); break;
+        case 'holidays': loadHolidaysPage(); break;
         case 'leave': loadLeavePortal(); break;
         case 'leave-approval': loadLeaveApprovals(); break;
         case 'ot': loadOTPage(); break;
@@ -1608,6 +1623,89 @@ async function addNotice() {
     loadNoticesPage();
     loadNotices();
     setTimeout(() => { msg.textContent = ''; }, 3000);
+}
+
+// ============================================================
+// HOLIDAYS PAGE
+// ============================================================
+const HOLIDAY_DATA = {
+    "February": [
+        { date: "04", day: "Wednesday", name: "Shab-e-Barat", note: "Subject to moon sighting" },
+        { date: "21", day: "Saturday", name: "Intl Mother Language Day" },
+        { date: "11", day: "Wednesday", name: "National Election" },
+        { date: "12", day: "Thursday", name: "National Election" }
+    ],
+    "March": [
+        { date: "19-24", day: "Thu-Tue", name: "Eid al-Fitr (6 Days)", note: "Employee list published by 12th March" },
+        { date: "26", day: "Thursday", name: "Independence Day" }
+    ],
+    "April": [
+        { date: "14", day: "Tuesday", name: "Bengali New Year" }
+    ],
+    "May": [
+        { date: "01", day: "Friday", name: "May Day" },
+        { date: "01", day: "Friday", name: "Buddha Purnima" },
+        { date: "26-31", day: "Tue-Sun", name: "Eid al-Adha (6 Days)", note: "Employee list published by 20th May" }
+    ],
+    "June": [
+        { date: "26", day: "Friday", name: "Ashura", note: "Subject to moon sighting" }
+    ],
+    "August": [
+        { date: "25", day: "Tuesday", name: "Eid-e-Milad un-Nabi", note: "Subject to moon sighting" }
+    ],
+    "October": [
+        { date: "21", day: "Wednesday", name: "Vijaya Dashami" }
+    ],
+    "December": [
+        { date: "16", day: "Tuesday", name: "Victory Day" },
+        { date: "25", day: "Thursday", name: "Christmas Day" }
+    ]
+};
+
+function loadHolidaysPage() {
+    const grid = document.getElementById('holidayMonthGrid');
+    const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+    if (grid.children.length === 0) {
+        months.forEach(m => {
+            const btn = document.createElement('div');
+            btn.className = 'month-btn';
+            btn.textContent = m;
+            if (HOLIDAY_DATA[m]) btn.style.fontWeight = 'bold';
+            else btn.style.color = '#aaa';
+            btn.onclick = function() {
+                grid.querySelectorAll('.month-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                showHolidayDetails(m);
+            };
+            grid.appendChild(btn);
+        });
+    }
+
+    // Clear details when switching away
+    document.getElementById('holidayDetails').style.display = 'none';
+}
+
+function showHolidayDetails(month) {
+    const container = document.getElementById('holidayDetails');
+    const data = HOLIDAY_DATA[month];
+
+    if (!data || data.length === 0) {
+        container.innerHTML = `<strong>${month}:</strong> No government holidays listed.`;
+        container.style.display = 'block';
+        return;
+    }
+
+    let html = `<h3 style="margin-top:0;color:var(--warning)">${month} Holidays</h3>`;
+    data.forEach(h => {
+        html += `<div style="margin-bottom:12px;border-bottom:1px solid #e2e8f0;padding-bottom:10px;">
+            <div style="font-weight:700;color:#c05621;font-size:15px">${h.date} <span style="font-weight:400;color:#4a5568;font-size:13px">(${h.day})</span></div>
+            <div style="font-size:14px;margin-top:4px">${h.name}</div>
+            ${h.note ? `<div style="font-size:12px;color:#718096;margin-top:2px">ℹ️ ${h.note}</div>` : ''}
+        </div>`;
+    });
+    container.innerHTML = html;
+    container.style.display = 'block';
 }
 
 // ============================================================
