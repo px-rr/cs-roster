@@ -125,8 +125,8 @@ function requireSuperAdmin(params, handler) {
 // ============================================================
 
 function handleLogin(params) {
-  var username = (params.username || '').toString().trim();
-  var password = (params.password || '').toString().trim();
+  var username = String(params.username || '').trim();
+  var password = String(params.password || '').trim();
 
   var sheet = getSheet(SHEETS.USERS);
   var data = sheet.getDataRange().getValues();
@@ -134,7 +134,7 @@ function handleLogin(params) {
   var userRow = null;
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === username || data[i][1] === username) {
+    if (String(data[i][0]) === username || String(data[i][1]) === username) {
       userRow = data[i];
       break;
     }
@@ -142,20 +142,20 @@ function handleLogin(params) {
 
   if (!userRow) return { success: false, error: 'User not found' };
 
-  var storedHash = userRow[2];
+  var storedHash = String(userRow[2]);
   var inputHash = hashPassword(password);
 
   if (storedHash !== inputHash) return { success: false, error: 'Invalid password' };
 
-  var status = userRow[4];
+  var status = String(userRow[4]);
   if (status === 'Terminated' || status === 'Resigned') {
     return { success: false, error: 'Account is ' + status.toLowerCase() };
   }
 
   var token = generateToken();
-  storeSession(token, userRow[0]);
+  storeSession(token, String(userRow[0]));
 
-  var isDefaultPw = (hashPassword(userRow[0]) === storedHash);
+  var isDefaultPw = (hashPassword(String(userRow[0])) === storedHash);
 
   return {
     success: true,
@@ -503,7 +503,7 @@ function handleGetLeaveRequests(params) {
 
   for (var i = 1; i < data.length; i++) {
     // Employees see only their own; admin/1101 see all
-    if (user.role === 'Employee' && data[i][1] !== user.employeeId) continue;
+    if (user.role === 'Employee' && String(data[i][1]) !== String(user.employeeId)) continue;
     var row = {};
     for (var j = 0; j < headers.length; j++) {
       row[headers[j]] = data[i][j];
@@ -566,8 +566,8 @@ function handleGetOTLogs(params) {
   var headers = data[0];
   var rows = [];
   for (var i = 1; i < data.length; i++) {
-    if (data[i][1] !== targetId) continue;
-    if (filterDate && data[i][0] !== filterDate) continue;
+    if (String(data[i][1]) !== String(targetId)) continue;
+    if (filterDate && String(data[i][0]) !== String(filterDate)) continue;
 
     var row = {};
     for (var j = 0; j < headers.length; j++) {
@@ -629,7 +629,7 @@ function generateToken() {
 function storeSession(token, employeeId) {
   var cache = getSessionCache();
   var data = JSON.stringify({
-    employeeId: employeeId,
+    employeeId: String(employeeId),
     createdAt: new Date().toISOString()
   });
   cache.put(token, data, CONFIG.SESSION_TTL_MINUTES * 60);
@@ -712,6 +712,7 @@ function isAdminRole(role) {
 // ============================================================
 
 function hashPassword(pwd) {
+  pwd = String(pwd);
   var digest = Utilities.computeDigest(
     Utilities.DigestAlgorithm.SHA_256,
     pwd,
@@ -937,6 +938,8 @@ function setup() {
   for (var j = 0; j < userHeaders.length; j++) {
     usersSheet.getRange(1, j + 1).setValue(userHeaders[j]);
   }
+  // Force text format on ID/username columns to prevent auto-conversion to numbers
+  usersSheet.getRange('A:B').setNumberFormat('@');
 
   // Create admin user
   var adminRow = [];
