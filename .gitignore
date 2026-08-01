@@ -1,0 +1,6 @@
+node_modules/
+data/roster.db*
+*.log
+.DS_Store
+Thumbs.db
+dbg.mjs

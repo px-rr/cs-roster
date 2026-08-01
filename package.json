@@ -1,0 +1,16 @@
+{
+  "name": "cs-roster-standalone",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CS Roster - Employee Management (standalone, no Google dependency)",
+  "type": "commonjs",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node test-api.mjs && node test-employee-isolation.mjs"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.15.0"
+  }
+}
