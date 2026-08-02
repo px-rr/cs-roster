@@ -739,6 +739,7 @@
             <div class="form-group"><label class="form-label">Confirm New Password</label><input type="password" class="form-input" id="pw_confirm"></div>
             <div class="btn-group">
                 <button class="submit-btn" onclick="changePassword()"><i class="fa-solid fa-save"></i> Update</button>
+                <button type="button" class="btn-secondary" onclick="cancelPasswordChange()">Cancel</button>
             </div>
             <div id="pwMsg" style="margin-top:10px;font-size:13px"></div>
         </div>
@@ -828,7 +829,7 @@ async function handleLogin() {
     document.getElementById('loginOverlay').classList.add('hidden');
     document.getElementById('appContainer').classList.add('show');
 
-    initApp();
+    initApp(result.data.mustChangePassword);
 }
 
 async function handleLogout() {
@@ -857,7 +858,15 @@ async function changePassword() {
     if (newPw.length < 8) { msg.textContent = 'Min 8 characters'; return; }
     if (newPw !== confirmPw) { msg.textContent = 'Passwords do not match'; return; }
 
+    const btn = document.querySelector('#pwModal .submit-btn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+
     const result = await callAPI('changePassword', { oldPassword: oldPw, newPassword: newPw });
+    btn.disabled = false;
+    btn.textContent = originalText;
+
     if (!result.success) { msg.textContent = result.error; return; }
 
     msg.textContent = 'Password updated!';
@@ -871,6 +880,15 @@ async function changePassword() {
     }, 1000);
 }
 
+function cancelPasswordChange() {
+    document.getElementById('pwModal').classList.remove('show');
+    document.getElementById('pw_old').value = '';
+    document.getElementById('pw_new').value = '';
+    document.getElementById('pw_confirm').value = '';
+    document.getElementById('pwMsg').textContent = '';
+    showToast('Password change cancelled', 'error');
+}
+
 async function checkSession() {
     const token = sessionStorage.getItem('csrfToken');
     if (!token) return false;
@@ -882,14 +900,19 @@ async function checkSession() {
         return false;
     }
     STATE.user = result.data.user;
+    STATE.mustChangePassword = result.data.mustChangePassword || false;
     return true;
 }
 
 // ============================================================
 // INIT
 // ============================================================
-async function initApp() {
+async function initApp(mustChangePw) {
     sessionStorage.setItem('csrfToken', STATE.token);
+
+    if (mustChangePw || STATE.mustChangePassword) {
+        document.getElementById('pwModal').classList.add('show');
+    }
 
     setupNav();
     updateHome();
