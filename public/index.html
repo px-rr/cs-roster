@@ -284,6 +284,9 @@
         <input type="password" id="loginPass" class="form-input" placeholder="Password" autocomplete="off">
         <button class="submit-btn" id="loginBtn" onclick="handleLogin()">Sign In</button>
         <div class="login-error" id="loginError"></div>
+        <div style="text-align:center;margin-top:12px;">
+          <a href="#" onclick="event.preventDefault();document.getElementById('forgotPasswordModal').classList.remove('hidden')" style="color:#1a73e8;font-size:14px;text-decoration:none;">Forgot Password?</a>
+        </div>
     </div>
 </div>
 
@@ -311,6 +314,7 @@
             <div class="nav-item" data-page="leave-approval" onclick="switchPage('leave-approval')" data-role="admin"><i class="fa-solid fa-check-double"></i> Approvals</div>
             <div class="nav-item" data-page="ot" onclick="switchPage('ot')" data-role="admin"><i class="fa-solid fa-stopwatch"></i> OT</div>
             <div class="nav-item" data-page="notices" onclick="switchPage('notices')" data-role="admin"><i class="fa-solid fa-bullhorn"></i> Notices</div>
+            <div class="nav-item" data-page="roster-mgmt" onclick="switchPage('roster-mgmt')" data-role="super"><i class="fa-solid fa-calendar-pen"></i> Roster Mgmt</div>
             <span id="logoutBtn" onclick="handleLogout()" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></span>
         </div>
     </nav>
@@ -343,6 +347,10 @@
             </div>
             <div id="shiftMsg" style="font-size:12px;color:var(--text-light);margin-top:8px;text-align:center"></div>
         </div>
+        <div id="employeeStats" class="card" style="display:none;">
+          <h3 style="font-size:18px;margin:0 0 12px"><i class="fa-solid fa-chart-line" style="color:var(--primary)"></i> My Overview</h3>
+          <div id="employeeStatsContent" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;"></div>
+        </div>
         <div class="three-col">
             <div class="card" style="text-align:center">
                 <div style="font-size:32px;font-weight:700;color:var(--primary)" id="homeDate">--</div>
@@ -358,7 +366,7 @@
             </div>
             <div class="card" id="homeFlashCard">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                    <div style="font-size:14px;font-weight:600;color:var(--text-main)"><i class="fa-solid fa-bullhorn" style="color:var(--warning)"></i> Priority Flash</div>
+                    <div style="font-size:14px;font-weight:600;color:var(--text-main)"><i class="fa-solid fa-bullhorn" style="color:var(--warning)"></i> Important Announcements</div>
                     <div id="flashAdminControls" style="display:none">
                         <button class="btn-secondary btn-sm" onclick="showAddFlash()"><i class="fa-solid fa-plus"></i></button>
                     </div>
@@ -380,9 +388,14 @@
                 <h2 style="margin:0;font-size:18px"><i class="fa-solid fa-list-check" style="color:#667eea"></i> Pending Items</h2>
                 <button class="btn-secondary btn-sm" onclick="showAddPendingItem()"><i class="fa-solid fa-plus"></i> Add</button>
             </div>
-            <div style="display:flex;gap:8px;margin-bottom:12px">
-                <input class="form-input" id="pendingInput" placeholder="Add a pending item..." style="display:none;font-size:13px" onkeydown="if(event.key==='Enter')addPendingItem()">
-                <select class="form-select" id="pendingAssignee" style="display:none;font-size:13px;width:auto"><option value="">Anyone</option></select>
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+                <input class="form-input" id="pendingInput" placeholder="Add a pending item..." style="display:none;font-size:13px;flex:1;min-width:200px" onkeydown="if(event.key==='Enter')addPendingItem()">
+                <select class="form-select" id="pendingAssignScope" style="display:none;font-size:13px;width:auto">
+                    <option value="">Everyone</option>
+                    <option value="__admins__">Admins Only</option>
+                </select>
+                <select class="form-select" id="pendingAssignee" style="display:none;font-size:13px;width:auto"><option value="">Select Employee</option></select>
+                <button class="submit-btn btn-sm" id="pendingSubmitBtn" style="display:none" onclick="addPendingItem()"><i class="fa-solid fa-check"></i></button>
             </div>
             <ul class="notice-list" id="pendingItemList"><li style="text-align:center;color:#cbd5e0">Loading...</li></ul>
         </div>
@@ -578,6 +591,10 @@
     <div id="page-leave" class="page-content">
         <div class="card">
             <h2><i class="fa-solid fa-tree"></i> Leave Portal</h2>
+            <div id="leaveProbationNote" style="display:none;padding:12px 16px;background:#fff7ed;border-left:4px solid var(--warning);border-radius:8px;margin-bottom:15px;font-size:13px;color:#92400e;">
+                <i class="fa-solid fa-circle-info" style="color:var(--warning)"></i>
+                <strong>Probation Notice:</strong> No leaves available during probation period (6 months from joining).
+            </div>
             <div id="leaveBalanceDisplay">
                 <div class="text-center" style="padding:20px;color:#a0aec0">Loading balance...</div>
             </div>
@@ -662,6 +679,56 @@
         </div>
     </div>
 
+    <!-- === PAGE: ROSTER MANAGEMENT (Super Admin) === -->
+    <div id="page-roster-mgmt" class="page-content">
+        <div class="card">
+            <h2><i class="fa-solid fa-calendar-pen"></i> Roster Management</h2>
+            <p style="font-size:13px;color:var(--text-light);margin-bottom:15px">Create and manage daily roster entries manually.</p>
+            <div class="two-col" style="margin-bottom:15px">
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" class="form-input" id="rm_date">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Day</label>
+                    <select class="form-select" id="rm_day">
+                        <option value="Sunday">Sunday</option><option value="Monday">Monday</option><option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option><option value="Thursday">Thursday</option><option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                    </select>
+                </div>
+            </div>
+            <div class="three-col" style="margin-bottom:15px">
+                <div class="form-group">
+                    <label class="form-label">Morning Shift (7am–3pm)</label>
+                    <input class="form-input" id="rm_morning" placeholder="e.g. 1001 & 1002">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Evening Shift (3pm–11pm)</label>
+                    <input class="form-input" id="rm_evening" placeholder="e.g. 1003">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Night Shift (11pm–7am)</label>
+                    <input class="form-input" id="rm_night" placeholder="e.g. 1004">
+                </div>
+            </div>
+            <button class="submit-btn" onclick="saveRosterEntry()"><i class="fa-solid fa-floppy-disk"></i> Save Entry</button>
+            <div id="rmMsg" style="margin-top:10px;font-size:13px"></div>
+        </div>
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <h3 style="font-size:16px;margin:0">Existing Roster Entries</h3>
+                <input type="text" id="rmSearch" placeholder="Search date..." class="form-input" style="width:180px;font-size:12px;padding:7px 10px" oninput="filterRosterEntries()">
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Date</th><th>Day</th><th>Morning</th><th>Evening</th><th>Night</th><th>Actions</th></tr></thead>
+                    <tbody id="rmTableBody"><tr><td colspan="6" class="text-center" style="padding:20px;color:#a0aec0">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- === CHANGE PASSWORD MODAL === -->
     <div class="modal-overlay" id="pwModal">
         <div class="modal-card">
@@ -675,6 +742,20 @@
             </div>
             <div id="pwMsg" style="margin-top:10px;font-size:13px"></div>
         </div>
+    </div>
+
+    <!-- === FORGOT PASSWORD MODAL === -->
+    <div id="forgotPasswordModal" class="modal hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;">
+      <div style="background:white;border-radius:12px;padding:24px;max-width:400px;width:90%;">
+        <h3 style="margin:0 0 16px;">Reset Password</h3>
+        <p style="color:#666;margin:0 0 16px;font-size:14px;">Enter your Employee ID or Username. A temporary password will be generated.</p>
+        <input type="text" id="resetUsername" placeholder="Employee ID or Username" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin-bottom:12px;box-sizing:border-box;">
+        <div id="resetResult" style="margin-bottom:12px;font-size:14px;"></div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="requestPasswordReset()" style="flex:1;padding:10px;background:#1a73e8;color:white;border:none;border-radius:8px;cursor:pointer;">Send Reset</button>
+          <button onclick="document.getElementById('forgotPasswordModal').classList.add('hidden')" style="flex:1;padding:10px;background:#eee;color:#333;border:none;border-radius:8px;cursor:pointer;">Cancel</button>
+        </div>
+      </div>
     </div>
 
     <!-- === TOAST === -->
@@ -826,6 +907,7 @@ async function initApp(mustChangePw) {
 
     // Today's shift (auto sign-in time, sign-out tick, duty/OT, idle)
     loadTodayShift();
+    loadEmployeeDashboard();
     startIdleTracking();
 
     // Date display
@@ -1010,6 +1092,7 @@ function switchPage(page) {
         case 'leave-approval': loadLeaveApprovals(); break;
         case 'ot': loadOTPage(); break;
         case 'notices': loadNoticesPage(); break;
+        case 'roster-mgmt': loadRosterMgmt(); break;
     }
 }
 
@@ -1849,43 +1932,82 @@ async function loadPendingItems() {
     if (!result.success) return;
     const list = document.getElementById('pendingItemList');
     const items = result.data || [];
+    const isSuper = STATE.user && STATE.user.role === 'Super Admin';
 
     if (items.length === 0) {
         list.innerHTML = '<li style="text-align:center;color:#a0aec0;font-style:italic">No pending items</li>';
         return;
     }
 
+    const emps = STATE.employees;
+    const getName = (id) => {
+        if (!id) return '';
+        if (id === '__admins__') return 'Admins Only';
+        const e = emps.find(x => x.employeeId === id);
+        return e ? (e.fullName || e.employeeId) : id;
+    };
+
     list.innerHTML = items.map(item => `
-        <li style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #edf2f7">
-            <input type="checkbox" ${item.completed==='true'?'checked':''} onchange="togglePendingItem('${item.id}',this.checked)" style="width:18px;height:18px;cursor:pointer">
+        <li style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #edf2f7">
+            <input type="checkbox" ${item.completed==='true'?'checked':''} onchange="resolvePendingItem('${item.id}',this.checked)" style="width:18px;height:18px;cursor:pointer;flex-shrink:0">
             <span style="flex:1;${item.completed==='true'?'text-decoration:line-through;color:#a0aec0':''}">${item.text}</span>
-            ${item.assignedTo ? `<span style="font-size:11px;color:var(--text-light);background:#f1f5f9;padding:2px 8px;border-radius:10px">${item.assignedTo}</span>` : ''}
-            <span style="font-size:11px;color:${item.completed==='true'?'var(--success)':'var(--warning)'}">${item.completed==='true'?'✓ Done':'Pending'}</span>
+            ${item.assignedTo ? `<span style="font-size:11px;color:var(--text-light);background:#f1f5f9;padding:2px 8px;border-radius:10px"><i class="fa-solid fa-user" style="margin-right:3px"></i>${getName(item.assignedTo)}</span>` : ''}
+            ${item.completed==='true' && item.resolvedBy ? `<span style="font-size:10px;color:var(--success);white-space:nowrap"><i class="fa-solid fa-check-circle"></i> ${getName(item.resolvedBy)}</span>` : ''}
+            <span style="font-size:11px;color:${item.completed==='true'?'var(--success)':'var(--warning)'};white-space:nowrap">${item.completed==='true'?'✓ Done':'Pending'}</span>
+            ${isSuper ? `<button class="btn-danger btn-sm" style="padding:4px 8px;font-size:11px" onclick="deletePendingItem('${item.id}')"><i class="fa-solid fa-trash"></i></button>` : ''}
         </li>
     `).join('');
 }
 
 function showAddPendingItem() {
     const input = document.getElementById('pendingInput');
+    const scope = document.getElementById('pendingAssignScope');
     const assignee = document.getElementById('pendingAssignee');
-    input.style.display = input.style.display === 'none' ? 'inline-block' : 'none';
-    assignee.style.display = assignee.style.display === 'none' ? 'inline-block' : 'none';
-    if (input.style.display !== 'none') input.focus();
+    const submitBtn = document.getElementById('pendingSubmitBtn');
+    const isVisible = input.style.display !== 'none';
+    input.style.display = isVisible ? 'none' : 'inline-block';
+    scope.style.display = isVisible ? 'none' : 'inline-block';
+    assignee.style.display = isVisible ? 'none' : 'inline-block';
+    submitBtn.style.display = isVisible ? 'none' : 'inline-flex';
+    if (!isVisible) input.focus();
+}
+
+function onPendingScopeChange() {
+    const scope = document.getElementById('pendingAssignScope').value;
+    const assignee = document.getElementById('pendingAssignee');
+    if (scope === '__admins__') {
+        assignee.style.display = 'none';
+    } else if (scope === '') {
+        assignee.style.display = 'inline-block';
+    }
 }
 
 async function addPendingItem() {
     const text = document.getElementById('pendingInput').value.trim();
-    const assignedTo = document.getElementById('pendingAssignee').value;
+    const scope = document.getElementById('pendingAssignScope').value;
+    const assignee = document.getElementById('pendingAssignee').value;
     if (!text) return;
+    const assignedTo = scope === '__admins__' ? '__admins__' : assignee;
     await callAPI('addPendingItem', { text, assignedTo });
     document.getElementById('pendingInput').value = '';
     document.getElementById('pendingInput').style.display = 'none';
+    document.getElementById('pendingAssignScope').style.display = 'none';
     document.getElementById('pendingAssignee').style.display = 'none';
+    document.getElementById('pendingSubmitBtn').style.display = 'none';
     loadPendingItems();
 }
 
-async function togglePendingItem(id, completed) {
-    await callAPI('updatePendingItem', { id, completed: completed.toString() });
+async function resolvePendingItem(id, completed) {
+    const result = await callAPI('updatePendingItem', { id, completed: completed.toString() });
+    if (!result.success) { showToast(result.error || 'Failed to update', 'error'); return; }
+    loadPendingItems();
+}
+
+async function deletePendingItem(id) {
+    if (!confirm('Delete this pending item?')) return;
+    const result = await callAPI('deletePendingItem', { id });
+    if (!result.success) { showToast(result.error || 'Failed to delete', 'error'); return; }
+    showToast('Item deleted', 'success');
     loadPendingItems();
 }
 
@@ -2340,6 +2462,156 @@ function showToast(message, type) {
     toast.style.background = type === 'error' ? '#ef4444' : '#333';
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ============================================================
+// FORGOT PASSWORD
+// ============================================================
+async function requestPasswordReset() {
+    const username = document.getElementById('resetUsername').value.trim();
+    const resultEl = document.getElementById('resetResult');
+    if (!username) { resultEl.innerHTML = '<span style="color:red;">Enter your username or ID</span>'; return; }
+    resultEl.innerHTML = '<span style="color:#666;">Processing...</span>';
+    const result = await callAPI('requestPasswordReset', { username });
+    if (result.success) {
+        resultEl.innerHTML = '<div style="background:#e8f5e9;padding:12px;border-radius:8px;"><strong style="color:#2e7d32;">Temporary Password: ' + result.data.tempPassword + '</strong><br><span style="font-size:13px;color:#555;">Use this to login, then change your password.</span></div>';
+    } else {
+        resultEl.innerHTML = '<span style="color:red;">' + (result.error || 'Reset failed') + '</span>';
+    }
+}
+
+// ============================================================
+// EMPLOYEE DASHBOARD (getMyDashboard)
+// ============================================================
+async function loadEmployeeDashboard() {
+    if (!STATE.token) return;
+    const result = await callAPI('getMyDashboard', { token: STATE.token });
+    if (!result.success) return;
+    const d = result.data;
+    const container = document.getElementById('employeeStatsContent');
+    const statsCard = document.getElementById('employeeStats');
+    if (!container || !statsCard) return;
+    statsCard.style.display = 'block';
+
+    const statusColor = d.employmentStatus === 'Permanent' ? '#2e7d32' : '#ed6c02';
+    const otHours = d.otSummary ? d.otSummary.totalOtHours : 0;
+    const leaveTotal = d.leaveBalance ? d.leaveBalance.total : 0;
+    const leaveCl = d.leaveBalance ? d.leaveBalance.cl : 0;
+    const leaveSl = d.leaveBalance ? d.leaveBalance.sl : 0;
+    const leaveEl = d.leaveBalance ? d.leaveBalance.el : 0;
+    const todayHours = d.todayShift ? d.todayShift.totalHours : 0;
+    const todayOt = d.todayShift ? d.todayShift.otHours : 0;
+
+    container.innerHTML = `
+        <div style="background:#f5f5f5;padding:16px;border-radius:8px;">
+            <div style="font-size:12px;color:#666;">Designation</div>
+            <div style="font-size:18px;font-weight:600;">${d.designation || '-'}</div>
+            <span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;background:${statusColor}20;color:${statusColor};margin-top:4px;">${d.employmentStatus || '-'}</span>
+        </div>
+        <div style="background:#f5f5f5;padding:16px;border-radius:8px;">
+            <div style="font-size:12px;color:#666;">Total OT Hours</div>
+            <div style="font-size:18px;font-weight:600;">${otHours}h</div>
+        </div>
+        <div style="background:#f5f5f5;padding:16px;border-radius:8px;">
+            <div style="font-size:12px;color:#666;">Leave Balance</div>
+            <div style="font-size:18px;font-weight:600;">${leaveTotal} days</div>
+            <div style="font-size:12px;color:#888;">CL:${leaveCl} | SL:${leaveSl} | EL:${leaveEl}</div>
+        </div>
+        <div style="background:#f5f5f5;padding:16px;border-radius:8px;">
+            <div style="font-size:12px;color:#666;">Today's Duty</div>
+            <div style="font-size:18px;font-weight:600;">${todayHours}h</div>
+            ${todayOt > 0 ? '<div style="font-size:12px;color:#ed6c02;">OT: ' + todayOt + 'h</div>' : ''}
+        </div>
+    `;
+}
+
+// ============================================================
+// ROSTER MANAGEMENT (Super Admin)
+// ============================================================
+async function loadRosterMgmt() {
+    if (!STATE.employees || STATE.employees.length === 0) {
+        const res = await callAPI('getAllEmployees');
+        if (res.success) STATE.employees = res.data;
+    }
+    renderRosterEntries();
+}
+
+async function saveRosterEntry() {
+    const date = document.getElementById('rm_date').value;
+    const day = document.getElementById('rm_day').value;
+    const morning = document.getElementById('rm_morning').value.trim();
+    const evening = document.getElementById('rm_evening').value.trim();
+    const night = document.getElementById('rm_night').value.trim();
+    const msg = document.getElementById('rmMsg');
+
+    if (!date) { msg.textContent = 'Select a date'; msg.style.color = 'var(--danger)'; return; }
+
+    const result = await callAPI('saveRosterEntry', { date, day, morning: morning || 'OFF', evening: evening || 'OFF', night: night || 'OFF' });
+    if (!result.success) { msg.textContent = result.error; msg.style.color = 'var(--danger)'; return; }
+
+    msg.textContent = 'Roster entry saved!';
+    msg.style.color = 'var(--success)';
+    document.getElementById('rm_date').value = '';
+    document.getElementById('rm_morning').value = '';
+    document.getElementById('rm_evening').value = '';
+    document.getElementById('rm_night').value = '';
+    loadRosterData();
+    renderRosterEntries();
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+}
+
+function renderRosterEntries(filter) {
+    const tbody = document.getElementById('rmTableBody');
+    const data = STATE.rosterData || [];
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="color:#a0aec0;padding:20px">No roster entries found</td></tr>';
+        return;
+    }
+
+    let filtered = data;
+    if (filter) {
+        const q = filter.toLowerCase();
+        filtered = data.filter(r => (r.date || '').toLowerCase().includes(q) || (r.day || '').toLowerCase().includes(q));
+    }
+
+    tbody.innerHTML = filtered.map(r => `
+        <tr>
+            <td>${r.date || '-'}</td>
+            <td>${r.day || '-'}</td>
+            <td>${r.morning || r.m || '-'}</td>
+            <td>${r.evening || r.e || '-'}</td>
+            <td>${r.night || r.n || '-'}</td>
+            <td>
+                <button class="btn-secondary btn-sm" onclick="editRosterEntry('${r.date}')"><i class="fa-solid fa-edit"></i></button>
+                <button class="btn-danger btn-sm" onclick="deleteRosterEntry('${r.date}')"><i class="fa-solid fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterRosterEntries() {
+    const q = document.getElementById('rmSearch').value.trim();
+    renderRosterEntries(q);
+}
+
+function editRosterEntry(date) {
+    const entry = STATE.rosterData.find(r => r.date === date);
+    if (!entry) return;
+    document.getElementById('rm_date').value = entry.date;
+    if (entry.day) document.getElementById('rm_day').value = entry.day;
+    document.getElementById('rm_morning').value = (entry.morning || entry.m || '').replace(/^OFF$/i, '');
+    document.getElementById('rm_evening').value = (entry.evening || entry.e || '').replace(/^OFF$/i, '');
+    document.getElementById('rm_night').value = (entry.night || entry.n || '').replace(/^OFF$/i, '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteRosterEntry(date) {
+    if (!confirm('Delete roster entry for ' + date + '?')) return;
+    const result = await callAPI('deleteRosterEntry', { date });
+    if (!result.success) { showToast(result.error || 'Delete failed', 'error'); return; }
+    showToast('Roster entry deleted', 'success');
+    loadRosterData();
+    renderRosterEntries();
 }
 </script>
 

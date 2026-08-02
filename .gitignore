@@ -4,3 +4,6 @@ data/roster.db*
 .DS_Store
 Thumbs.db
 dbg.mjs
+
+.vercel
+.env*

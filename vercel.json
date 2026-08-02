@@ -1,14 +1,13 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/index.js", "use": "nodejs22.x" },
-    { "src": "api/photos/[name].js", "use": "nodejs22.x" },
-    { "src": "public/index.html", "use": "@vercel/static" },
-    { "src": "public/**/*", "use": "@vercel/static" }
+    { "src": "api/index.js", "use": "@vercel/node" },
+    { "src": "api/photos/[name].js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "^/api$", "dest": "/api/index.js" },
     { "src": "^/photos/([^/]+)$", "dest": "/api/photos/[name].js" },
     { "src": "/(.*)", "dest": "/public/index.html" }
-  ]
+  ],
+  "outputDirectory": "public"
 }
