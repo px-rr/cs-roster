@@ -828,7 +828,7 @@ async function handleLogin() {
     document.getElementById('loginOverlay').classList.add('hidden');
     document.getElementById('appContainer').classList.add('show');
 
-    initApp(result.data.mustChangePassword);
+    initApp();
 }
 
 async function handleLogout() {
@@ -888,12 +888,8 @@ async function checkSession() {
 // ============================================================
 // INIT
 // ============================================================
-async function initApp(mustChangePw) {
+async function initApp() {
     sessionStorage.setItem('csrfToken', STATE.token);
-
-    if (mustChangePw) {
-        document.getElementById('pwModal').classList.add('show');
-    }
 
     setupNav();
     updateHome();
@@ -1049,7 +1045,7 @@ window.onload = async function() {
     if (restored) {
         document.getElementById('loginOverlay').classList.add('hidden');
         document.getElementById('appContainer').classList.add('show');
-        initApp(false);
+        initApp();
     }
 };
 
