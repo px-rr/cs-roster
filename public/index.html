@@ -285,7 +285,7 @@
         <button class="submit-btn" id="loginBtn" onclick="handleLogin()">Sign In</button>
         <div class="login-error" id="loginError"></div>
         <div style="text-align:center;margin-top:12px;">
-          <a href="#" onclick="event.preventDefault();document.getElementById('forgotPasswordModal').classList.remove('hidden')" style="color:#1a73e8;font-size:14px;text-decoration:none;">Forgot Password?</a>
+          <a href="#" onclick="event.preventDefault();document.getElementById('forgotPasswordModal').style.display='flex'" style="color:#1a73e8;font-size:14px;text-decoration:none;">Forgot Password?</a>
         </div>
     </div>
 </div>
@@ -745,7 +745,7 @@
     </div>
 
     <!-- === FORGOT PASSWORD MODAL === -->
-    <div id="forgotPasswordModal" class="modal hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;">
+    <div id="forgotPasswordModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:10000;">
       <div style="background:white;border-radius:12px;padding:24px;max-width:400px;width:90%;">
         <h3 style="margin:0 0 16px;">Reset Password</h3>
         <p style="color:#666;margin:0 0 16px;font-size:14px;">Enter your Employee ID or Username. A temporary password will be generated.</p>
@@ -753,7 +753,7 @@
         <div id="resetResult" style="margin-bottom:12px;font-size:14px;"></div>
         <div style="display:flex;gap:8px;">
           <button onclick="requestPasswordReset()" style="flex:1;padding:10px;background:#1a73e8;color:white;border:none;border-radius:8px;cursor:pointer;">Send Reset</button>
-          <button onclick="document.getElementById('forgotPasswordModal').classList.add('hidden')" style="flex:1;padding:10px;background:#eee;color:#333;border:none;border-radius:8px;cursor:pointer;">Cancel</button>
+          <button onclick="document.getElementById('forgotPasswordModal').style.display='none'" style="flex:1;padding:10px;background:#eee;color:#333;border:none;border-radius:8px;cursor:pointer;">Cancel</button>
         </div>
       </div>
     </div>
